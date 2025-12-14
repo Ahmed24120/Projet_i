@@ -1,81 +1,141 @@
 // backend/src/sockets/index.js
 let io = null;
 
+// Présence réseau (heartbeat)
+const lastSeen = new Map(); // key: `${examId}:${studentId}` -> timestamp ms
+const key = (examId, studentId) => `${examId}:${studentId}`;
+
+// Timers d’examen (démarrage/prof → warning -5min → fin)
+const examTimers = new Map(); // examId -> { endAt, toWarn, toEnd }
+
 function initSocket(server) {
   const { Server } = require("socket.io");
   io = new Server(server, {
-    cors: {
-      origin: "*", // TODO: en prod, mets l'URL du frontend
-      methods: ["GET", "POST"],
-    },
+    cors: { origin: "*", methods: ["GET", "POST"] },
   });
 
   console.log("✅ Socket.io initialisé");
 
   io.on("connection", (socket) => {
-    console.log("🟢 New client connected:", socket.id);
+    console.log("🟢 Client connecté:", socket.id);
 
-    // === TEST SIMPLE : ping -> pong ===
+    // --- Ping/Pong simple (pour ta page /socket-test)
     socket.on("ping", (data) => {
-      console.log("📩 ping reçu :", data);
-      // répondre juste à l’émetteur
-      socket.emit("pong", {
-        ok: true,
-        echo: data,
-        serverTime: new Date().toISOString(),
-      });
+      socket.emit("pong", { ok: true, echo: data, serverTime: new Date().toISOString() });
     });
 
-    // === ROOMS D’EXAMEN (optionnel, prêt à l’emploi) ===
-    // rejoindre une room d’examen
-    socket.on("join-exam", ({ examId, userId, role }) => {
+    // --- Rejoindre/quitter une room d’examen
+    socket.on("join-exam", ({ examId, studentId, matricule, role }) => {
       if (!examId) return;
       const room = `exam:${examId}`;
       socket.join(room);
-      console.log(`👥 ${userId || socket.id} a rejoint ${room} (${role || "unknown"})`);
-      // notifier toute la room (professeur inclus)
+      socket.data = { examId, studentId, matricule, role };
+      if (studentId) lastSeen.set(key(examId, studentId), Date.now());
       io.to(room).emit("student-connected", {
         examId,
-        userId: userId || socket.id,
-        role: role || "unknown",
+        studentId: studentId || socket.id,
+        matricule,
+        role,
         at: Date.now(),
       });
     });
 
-    // quitter une room d’examen
-    socket.on("leave-exam", ({ examId, userId }) => {
+    socket.on("leave-exam", ({ examId, studentId }) => {
       if (!examId) return;
       const room = `exam:${examId}`;
       socket.leave(room);
       io.to(room).emit("student-disconnected", {
         examId,
-        userId: userId || socket.id,
+        studentId: studentId || socket.id,
         at: Date.now(),
       });
     });
 
-    // notifier un fichier soumis (si tu l’appelles depuis l’API HTTP après upload)
-    socket.on("file-submitted", ({ examId, studentId, fileName }) => {
+    // --- Heartbeat pour présence réseau (Wi-Fi)
+    socket.on("heartbeat", ({ examId, studentId }) => {
+      if (examId && studentId) lastSeen.set(key(examId, studentId), Date.now());
+    });
+
+    // --- Notification d’upload (si tu veux pousser depuis client)
+    socket.on("file-submitted", ({ examId, studentId, fileName, is_final }) => {
       if (!examId) return;
-      const room = `exam:${examId}`;
-      io.to(room).emit("file-submitted", {
+      io.to(`exam:${examId}`).emit("submission-upserted", {
         examId,
         studentId,
         fileName,
+        is_final: !!is_final,
         at: Date.now(),
       });
     });
 
+    // --- ⏱️ Démarrer/Stopper l’examen (émis par la page professeur)
+    socket.on("start-exam", ({ examId, durationMin, endAt }) => {
+      if (!examId) return;
+      const room = `exam:${examId}`;
+
+      // calcule fin si non fournie
+      const end = endAt ? new Date(endAt).getTime()
+                        : Date.now() + (Number(durationMin) || 90) * 60 * 1000;
+
+      // clear anciens timers
+      const old = examTimers.get(examId);
+      if (old) { clearTimeout(old.toWarn); clearTimeout(old.toEnd); }
+
+      const msLeft = Math.max(end - Date.now(), 0);
+      const warnIn = Math.max(msLeft - 5 * 60 * 1000, 0);
+
+      const toWarn = setTimeout(() => {
+        io.to(room).emit("exam-warning", { examId, minutesLeft: 5, endAt: end });
+      }, warnIn);
+
+      const toEnd = setTimeout(() => {
+        io.to(room).emit("exam-ended", { examId, endAt: end });
+      }, msLeft);
+
+      examTimers.set(examId, { endAt: end, toWarn, toEnd });
+
+      io.to(room).emit("exam-started", { examId, endAt: end });
+      console.log(`⏱️ Exam ${examId} started → endAt=${new Date(end).toISOString()}`);
+    });
+
+    socket.on("stop-exam", ({ examId }) => {
+      const t = examTimers.get(examId);
+      if (t) { clearTimeout(t.toWarn); clearTimeout(t.toEnd); examTimers.delete(examId); }
+      io.to(`exam:${examId}`).emit("exam-stopped", { examId });
+      console.log(`⏹️ Exam ${examId} stopped`);
+    });
+
+    // --- Déconnexion
     socket.on("disconnect", () => {
-      console.log("🔴 Client disconnected:", socket.id);
+      const { examId, studentId } = socket.data || {};
+      if (!examId) return;
+      io.to(`exam:${examId}`).emit("student-disconnected", {
+        examId,
+        studentId: studentId || socket.id,
+        at: Date.now(),
+      });
     });
   });
+
+  // Watchdog: si plus de heartbeat >20s → offline
+  setInterval(() => {
+    const now = Date.now();
+    for (const [k, ts] of lastSeen.entries()) {
+      if (now - ts > 20000) {
+        const [examId, studentId] = k.split(":");
+        io.to(`exam:${examId}`).emit("student-offline", {
+          examId: Number(examId),
+          studentId,
+          at: now,
+        });
+        lastSeen.delete(k);
+      }
+    }
+  }, 15000);
 }
 
 function getIO() {
-  if (!io) {
-    throw new Error("Socket.io not initialized");
-  }
+  if (!io) throw new Error("Socket.io not initialized");
   return io;
 }
 
