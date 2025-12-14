@@ -1,30 +1,65 @@
-export const API_BASE =
+const baseUrl =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-export async function api<T>(
+/**
+ * Generic API fetch helper
+ */
+export async function apiFetch<T>(
   path: string,
-  opts: RequestInit = {}
+  options: RequestInit = {},
+  token?: string
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${baseUrl}${path}`, {
+    ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(opts.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
     },
-    ...opts,
   });
+
+  const data = await res.json().catch(() => null);
+
   if (!res.ok) {
-    const msg = await res.text();
-    throw new Error(msg || `HTTP ${res.status}`);
+    const message =
+      (data && (data.message || data.error)) ||
+      `Request failed (${res.status})`;
+    throw new Error(message);
   }
-  return res.json();
+
+  return data as T;
 }
 
-export async function loginProfessor(email: string, password: string) {
-  return api<{ token: string; user: { id: number; role: string; name?: string } }>(
-    "/auth/login",
-    {
-      method: "POST",
-      body: JSON.stringify({ email, password, role: "professor" }),
-    }
-  );
+/**
+ * Professor login
+ */
+export async function loginProfessor(
+  email: string,
+  password: string
+) {
+  return apiFetch<{ token: string }>(`/auth/login`, {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password,
+      role: "professor",
+    }),
+  });
+}
+
+/**
+ * Student login
+ */
+export async function loginStudent(
+  email: string,
+  password: string
+) {
+  return apiFetch<{ token: string }>(`/auth/login`, {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password,
+      role: "student",
+    }),
+  });
 }
