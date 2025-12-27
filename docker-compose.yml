@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: exam-backend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/database.db:/app/database.db
+    restart: unless-stopped
+    environment:
+      - JWT_SECRET=supersecretclefdetest123
+      - PORT=3001
+
+  frontend:
+    build: ./frontend
+    container_name: exam-frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      # L'URL côté serveur (Next.js server side fetch)
+      - NEXT_PUBLIC_API_URL=http://backend:3001
+    depends_on:
+      - backend
+
+# Réseau par défaut en bridge

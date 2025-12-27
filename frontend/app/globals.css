@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+  --primary: #3b82f6;
+  --secondary: #8b5cf6;
+
+  /* Animations */
+  --animate-float: float 4s ease-in-out infinite;
+  --animate-shimmer: shimmer 2s infinite;
+  --animate-pulse-glow: pulse-glow 2s infinite;
+  --animate-fade-in: fade-in-up 0.6s ease-out forwards;
+  --animate-slide-up: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@theme {
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+
+  --color-secondary-500: #8b5cf6;
+
+  --animate-fade-in: fade-in-up 0.6s ease-out forwards;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))) rgb(var(--background-start-rgb));
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Keyframes */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Utility classes for animations if not using Tailwind config extension */
+.animate-float {
+  animation: var(--animate-float);
+}
+
+.animate-shimmer {
+  animation: var(--animate-shimmer);
+}
+
+.animate-pulse-glow {
+  animation: var(--animate-pulse-glow);
+}
+
+.animate-fade-in {
+  animation: var(--animate-fade-in);
+}
+
+.animate-slide-up {
+  animation: var(--animate-slide-up);
+}
+
+/* Couleurs lisibles demandées */
+.text-readable {
+  color: #1f2937 !important;
+}
+
+.bg-notification {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+}
+
+.bg-cheat-alert {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+.bg-submission-success {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+}
+
+/* Amélioration des cartes étudiants */
+.student-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: all 0.3s ease;
+  color: #1f2937;
+}
+
+.student-card.connected {
+  border-left: 4px solid #10b981;
+}
+
+.student-card.cheating {
+  border-left: 4px solid #ef4444;
+  background-color: #fef2f2;
+}
+
+.student-card.disconnected {
+  border-left: 4px solid #6b7280;
+  opacity: 0.8;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
