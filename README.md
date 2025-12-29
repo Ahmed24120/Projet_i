@@ -1,36 +1,81 @@
-# Projet d'Examen Sécurisé
+# 🎓 Système d'Examen Sécurisé
 
-Système complet de gestion d'examens avec surveillance en temps réel et anti-triche.
+Bienvenue dans le projet de système d'examen sécurisé. Ce projet comprend un **Backend** (API & WebSockets) et un **Frontend** (Interface Next.js).
 
-## 🚀 Installation des Dépendances
+## 📁 Structure du Projet
 
-Pour installer toutes les bibliothèques nécessaires, exécutez les commandes suivantes dans votre terminal :
+- `backend/` : Serveur Express, gestion de la base de données et communications temps réel.
+- `frontend/` : Application Next.js pour les étudiants et les professeurs.
 
-### 1. Backend
-```bash
-cd backend
-npm install
-```
+---
 
-### 2. Frontend
-```bash
-cd frontend
-npm install
-```
+## 🚀 Installation & Lancement Rapide
 
-## 🛠️ Lancement du Projet
+Pour commencer, clonez le projet et suivez les étapes ci-dessous.
 
-### Backend
-```bash
-cd backend
-npm run dev
-```
+### 1. Configuration du Backend
 
-### Frontend
-```bash
-cd frontend
-npm run dev
-```
+1. **Accédez au dossier :**
+   ```bash
+   cd backend
+   ```
 
-- backend/ : API Express + WebSocket + base de données
-- frontend/ : application Next.js (professeur + étudiant)
+2. **Installez les dépendances :**
+   ```bash
+   npm install
+   ```
+
+3. **Initalisez la base de données :**
+   ```bash
+   node database_init.js
+   ```
+
+4. **Lancez le serveur :**
+   ```bash
+   npm run dev
+   ```
+   *Le serveur tourne généralement sur le port 5000.*
+
+---
+
+### 2. Configuration du Frontend
+
+1. **Ouvrez un nouveau terminal et accédez au dossier :**
+   ```bash
+   cd frontend
+   ```
+
+2. **Installez les dépendances :**
+   ```bash
+   npm install
+   ```
+
+3. **Lancez l'application :**
+   ```bash
+   npm run dev
+   ```
+   *L'application est accessible sur [http://localhost:3000](http://localhost:3000).*
+
+---
+
+## 🛠️ Technologies Utilisées
+
+- **Backend :** Node.js, Express, Socket.io, SQLite, Bcrypt.
+- **Frontend :** Next.js 15, Tailwind CSS, Lucide React.
+
+## 🔒 Fonctionnalités Anti-Triche
+- Surveillance en temps réel des étudiants.
+- Détection de changement d'onglet/fenêtre.
+- Alertes instantanées pour le professeur.
+
+---
+
+## 📡 Commandes Git Utiles
+
+### Pour envoyer vos modifications (Main) :
+`git add .`
+`git commit -m "Description de vos changements"`
+`git push origin main`
+
+### Pour récupérer les dernières mises à jour :
+`git pull origin main`
