@@ -19,5 +19,5 @@
 **/*.log
 # **/database.db  # Commenté pour partager la DB avec l'équipe
 # **/database.db-journal
-**/uploads/*
-!**/uploads/.gitkeep
+# **/uploads/*  # Commenté pour partager les fichiers avec l'équipe
+# !**/uploads/.gitkeep
