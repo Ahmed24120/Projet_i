@@ -80,6 +80,11 @@ db.serialize(() => {
     if (!err) console.log("✅ Migration: Colonne exam_id ajoutée à works");
   });
 
+  // Migration: Ajouter status si la table existe déjà sans
+  db.run("ALTER TABLE works ADD COLUMN status TEXT DEFAULT 'active'", (err) => {
+    if (!err) console.log("✅ Migration: Colonne status ajoutée à works");
+  });
+
   db.run(`
     CREATE TABLE IF NOT EXISTS matieres (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +112,16 @@ db.serialize(() => {
       type TEXT DEFAULT 'info',
       cleared INTEGER DEFAULT 0,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS exam_results (
+      exam_id INTEGER,
+      student_id INTEGER,
+      is_finalized INTEGER DEFAULT 0,
+      finalized_at DATETIME,
+      PRIMARY KEY (exam_id, student_id)
     )
   `);
 

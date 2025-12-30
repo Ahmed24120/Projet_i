@@ -4,6 +4,7 @@ const db = require("../db");
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
+const { authenticateToken } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -63,12 +64,28 @@ router.get("/", (_req, res) => {
   });
 });
 
-// Détail d’un examen
-router.get("/:id", (req, res) => {
-  db.get("SELECT * FROM examen WHERE id = ?", [req.params.id], (err, row) => {
+// GET /:id - Détails d'un examen
+router.get("/:id", authenticateToken, (req, res) => {
+  const sql = `SELECT * FROM examen WHERE id = ?`;
+  db.get(sql, [req.params.id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: "Examen non trouvé" });
-    res.json(row);
+
+    // Check if finalized for this student
+    if (req.user && req.user.role === 'student') {
+      db.get(
+        `SELECT is_finalized FROM exam_results WHERE exam_id = ? AND student_id = ?`,
+        [req.params.id, req.user.id],
+        (err, result) => {
+          if (result && result.is_finalized) {
+            row.isFinalized = true;
+          }
+          res.json(row);
+        }
+      );
+    } else {
+      res.json(row);
+    }
   });
 });
 
@@ -205,38 +222,50 @@ router.get("/:id/resources", (req, res) => {
   });
 });
 
-// ✅ Nouveau : Lister les soumissions (fichiers physiques + records DB)
+// ✅ Nouveau : Lister les soumissions (DB + Active only)
 router.get("/:id/submissions", (req, res) => {
   const examId = req.params.id;
-  const studentsDir = path.join(__dirname, "../../uploads/exams", String(examId), "students");
 
-  if (!fs.existsSync(studentsDir)) {
-    return res.json([]);
-  }
+  const sql = `
+    SELECT w.*, er.is_finalized 
+    FROM works w
+    LEFT JOIN exam_results er ON w.exam_id = er.exam_id AND w.id_etud = er.student_id
+    WHERE w.exam_id = ? 
+    AND (w.status != 'cancelled' OR w.status IS NULL)
+    ORDER BY w.last_update DESC
+  `;
 
-  try {
-    const folders = fs.readdirSync(studentsDir);
-    const results = folders.map(matricule => {
-      const folderPath = path.join(studentsDir, matricule);
-      if (fs.statSync(folderPath).isDirectory()) {
-        const files = fs.readdirSync(folderPath).map(f => {
-          const stats = fs.statSync(path.join(folderPath, f));
+  db.all(sql, [examId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const results = rows.map(row => {
+      let files = [];
+      try {
+        const filenames = JSON.parse(row.file_paths || "[]");
+        files = filenames.map(f => {
+          // Construct absolute path to check existence
+          const absPath = path.join(__dirname, "../../uploads/exams", String(examId), "students", row.matricule, f);
+          const exists = fs.existsSync(absPath);
+
           return {
-            name: f,
-            size: stats.size,
-            at: stats.mtime,
-            url: `/static/exams/${examId}/students/${matricule}/${f}`
+            name: f.replace(/^\d+_/, ''),
+            size: 0,
+            at: row.last_update,
+            url: `/static/exams/${examId}/students/${row.matricule}/${f}`,
+            exists: exists
           };
         });
-        return { matricule, files };
-      }
-      return null;
-    }).filter(Boolean);
+      } catch (e) { }
+
+      return {
+        matricule: row.matricule,
+        isFinalized: !!row.is_finalized,
+        files
+      };
+    });
 
     res.json(results);
-  } catch (e) {
-    res.status(500).json({ error: "Erreur lors du scan des dossiers" });
-  }
+  });
 });
 
 // ✅ Nouveau : Lister les logs d'un examen

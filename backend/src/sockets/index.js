@@ -12,7 +12,22 @@ const key = (examId, studentId) => `${examId}:${studentId}`;
 const activeExams = new Map(); // examId -> { endTime, intervalId }
 
 // Global Connected Students (Monitoring)
-const studentsPresence = new Map(); // studentId -> { studentId, name, matricule, ip, status, lastSeen }
+const studentsPresence = new Map(); // studentId -> { studentId, name, matricule, ip, status, lastSeen, history: [] }
+
+function addStudentLog(studentId, type, message) {
+  const student = studentsPresence.get(studentId);
+  if (student) {
+    if (!student.history) student.history = [];
+    student.history.push({
+      type,
+      message,
+      at: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      timestamp: Date.now()
+    });
+    // Keep last 50 logs
+    if (student.history.length > 50) student.history.shift();
+  }
+}
 
 let watchdog = null;
 
@@ -50,14 +65,40 @@ function initSocket(server) {
 
       if (role === 'student') {
         const clientIp = socket.handshake.address;
-        studentsPresence.set(studentId, {
-          studentId,
-          matricule: matricule || studentId,
-          ip: clientIp,
-          status: 'connected',
-          name: matricule || studentId,
-          lastSeen: Date.now()
-        });
+        const existing = studentsPresence.get(studentId);
+
+        if (!existing) {
+          studentsPresence.set(studentId, {
+            studentId,
+            examId,
+            matricule: matricule || studentId,
+            ip: clientIp,
+            status: 'connected',
+            name: matricule || studentId,
+            lastSeen: Date.now(),
+            history: []
+          });
+          addStudentLog(studentId, 'CONNEXION', 'L\'étudiant s\'est connecté');
+        } else {
+          // Reconnection or multiple tabs?
+          const oldIp = existing.ip;
+          existing.examId = examId; // Track current exam
+          existing.ip = clientIp;
+          existing.status = 'connected';
+          existing.lastSeen = Date.now();
+
+          if (oldIp && oldIp !== clientIp && existing.history.length > 0) {
+            addStudentLog(studentId, 'RESEAU_SUSPECT', `Changement d'IP détecté : ${oldIp} -> ${clientIp} (Données mobiles ?)`);
+            io.to('professors').emit('alert', {
+              type: 'NETWORK_CHANGE',
+              message: `⚠️ تغيير شبكة مشبوه للطالب ${matricule || studentId} (من ${oldIp} إلى ${clientIp})`,
+              level: 'warning',
+              studentId
+            });
+          } else {
+            addStudentLog(studentId, 'RECONNEXION', 'L\'étudiant s\'est reconnecté');
+          }
+        }
         io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
       }
 
@@ -129,11 +170,18 @@ function initSocket(server) {
     });
 
     socket.on("cheat-alert", (payload) => {
+      // User request: ONLY network-related alerts are kept.
+      // We skip TAB_SWITCH and FOCUS_LOST if they arrive, but ideally the frontend stops sending them.
+      if (payload.type === 'TAB_SWITCH' || payload.type === 'FOCUS_LOST') return;
+
       // Save to DB
       db.run(
         "INSERT INTO logs (exam_id, matricule, action, type) VALUES (?, ?, ?, ?)",
         [payload.examId, payload.matricule || payload.studentId, payload.details, 'warn']
       );
+
+      // Add to internal history
+      addStudentLog(payload.studentId, 'FRAUDE', payload.details);
 
       io.to('professors').emit('alert', {
         type: 'CHEAT_ATTEMPT',
@@ -142,6 +190,85 @@ function initSocket(server) {
         studentId: payload.studentId
       });
       io.to('professors').emit("cheat-alert", payload);
+      io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
+    });
+
+    socket.on("network-status", ({ studentId, online }) => {
+      if (!studentId) return;
+      const student = studentsPresence.get(studentId);
+      if (student) {
+        student.status = online ? 'connected' : 'no-wifi';
+        student.lastSeen = Date.now();
+        const msg = online ? 'Wi-Fi rétabli' : 'Wi-Fi déconnecté';
+        addStudentLog(studentId, online ? 'WIFI_RETOUR' : 'WIFI_PERDU', msg);
+
+        if (!online) {
+          io.to('professors').emit('alert', {
+            type: 'WIFI_OFF',
+            message: `📡 الطالب ${student.matricule} فقد الاتصال بالـ Wi-Fi`,
+            level: 'warning',
+            studentId
+          });
+        }
+        io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
+      }
+    });
+
+    socket.on("submission:cancelled", ({ examId, workId }) => {
+      const { studentId, matricule } = socket.data;
+      if (!examId || !workId) return;
+
+      console.log(`📡 Event: submission:cancelled | workId: ${workId} by ${matricule}`);
+
+      // Mettre à jour la DB
+      db.run("UPDATE works SET status = 'cancelled' WHERE id = ?", [workId], function (err) {
+        if (err) {
+          console.error("❌ Erreur annulation soumission:", err.message);
+          return;
+        }
+
+        // Notifier le prof
+        io.to('professors').emit('professor:submission-update', {
+          type: 'CANCELLED',
+          examId,
+          studentId,
+          workId,
+          matricule
+        });
+
+        // Log
+        addStudentLog(studentId, 'ANNULATION', `Annulation du fichier #${workId}`);
+        io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
+      });
+    });
+
+    socket.on("finalize-exam", ({ examId, studentId }) => {
+      if (!studentId) return;
+
+      const sql = `INSERT INTO exam_results (exam_id, student_id, is_finalized, finalized_at) 
+                   VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+                   ON CONFLICT(exam_id, student_id) DO UPDATE SET is_finalized=1`;
+
+      db.run(sql, [examId, studentId], (err) => {
+        if (err) console.error("Error saving finalization:", err);
+      });
+
+      const student = studentsPresence.get(String(studentId));
+      if (student) {
+        student.status = 'finalized';
+        // Force update status in memory map for immediate UI reflect
+        student.isFinalized = true;
+
+        addStudentLog(studentId, 'FINALISATION', 'L\'étudiant a terminé son examen');
+
+        io.to('professors').emit('alert', {
+          type: 'EXAM_FINISHED',
+          message: `🏁 الطالب ${student.matricule} انتهى من الامتحان نهائياً`,
+          level: 'success',
+          studentId
+        });
+        io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
+      }
     });
 
     socket.on("disconnect", () => {
@@ -151,6 +278,7 @@ function initSocket(server) {
         if (student) {
           student.status = 'disconnected';
           student.lastSeen = Date.now();
+          addStudentLog(studentId, 'DECONNEXION', 'L\'étudiant s\'est déconnecté (Socket close)');
           io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
           if (examId) {
             io.to(`exam:${examId}`).emit("student-disconnected", { studentId, at: Date.now() });
@@ -171,6 +299,7 @@ function initSocket(server) {
     for (const [sid, student] of studentsPresence.entries()) {
       if (student.status === 'connected' && now - (student.lastSeen || 0) > 40000) {
         student.status = 'offline';
+        addStudentLog(sid, 'TIMEOUT', 'Inactivité prolongée (offline)');
         io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
         // Optional: emit to specific exam rooms if we track examId in presence
       }

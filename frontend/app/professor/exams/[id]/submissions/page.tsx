@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { getSocket } from "@/lib/socket";
 import { apiFetch, baseUrl } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -33,6 +34,17 @@ export default function ExamSubmissions() {
             return;
         }
         loadData();
+
+        // Real-time refresh
+        const socket = getSocket();
+        socket.emit("professor-join"); // Ensure receiving alerts
+        socket.on("file-submitted", () => loadData());
+        socket.on("file-removed", () => loadData());
+
+        return () => {
+            socket.off("file-submitted");
+            socket.off("file-removed");
+        };
     }, [id]);
 
     async function loadData() {

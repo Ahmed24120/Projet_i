@@ -4,22 +4,29 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getSocket } from "@/lib/socket";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, baseUrl } from "@/lib/api";
 import { toast } from "@/components/ui/Toast";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
+type SubmittedFile = {
+    name: string;
+    url: string;
+    exists?: boolean;
+};
+
 type StudentState = {
     studentId: string;
     matricule?: string;
     nom?: string;
     role?: string;
-    status: "online" | "offline";
+    status: "online" | "offline" | "no-wifi";
     lastSeen?: number;
     warnings: string[];
-    submittedFiles: string[];
+    submittedFiles: SubmittedFile[];
+    isFinalized?: boolean;
 };
 
 export default function ProfessorMonitor() {
@@ -33,12 +40,13 @@ export default function ProfessorMonitor() {
     const [timeLeftMs, setTimeLeftMs] = useState<number>(Infinity);
     const [isEnded, setIsEnded] = useState(false);
     const [showClearLogsConfirm, setShowClearLogsConfirm] = useState(false);
+    const [selectedStudentForFiles, setSelectedStudentForFiles] = useState<StudentState | null>(null);
+    const [previewFile, setPreviewFile] = useState<SubmittedFile | null>(null);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (token) {
             apiFetch(`/exams/${id}`, {}, token).then((d: any) => setExamTitle(d.titre)).catch(() => { });
-            loadLogs();
         }
 
         async function loadLogs() {
@@ -49,14 +57,44 @@ export default function ProfessorMonitor() {
                         id: l.id,
                         msg: l.action,
                         type: l.type,
-                        time: new Date(l.timestamp).toLocaleTimeString(),
+                        time: new Date(l.timestamp).toLocaleTimeString('ar-MA'),
                         matricule: l.matricule
                     })));
                 }
             } catch (e) { }
         }
 
+        loadLogs();
+        socket.emit("professor-join");
         socket.emit("join-exam", { examId: id, role: "professor" });
+
+        socket.on("update-student-list", (list: any[]) => {
+            const examStudents = list.filter(s => String(s.examId) === String(id));
+            setStudents(prev => {
+                const newMap: Record<string, StudentState> = {};
+                examStudents.forEach(s => {
+                    // Preserve existing files if we already know them
+                    const existing = prev[s.studentId];
+                    newMap[s.studentId] = {
+                        studentId: s.studentId,
+                        matricule: s.matricule,
+                        nom: s.name,
+                        status: s.status as any,
+                        lastSeen: s.lastSeen,
+                        warnings: s.history?.filter((h: any) => h.type === 'FRAUDE').map((h: any) => h.message) || [],
+                        submittedFiles: existing ? existing.submittedFiles : []
+                    };
+                });
+                return newMap;
+            });
+        });
+
+        socket.on("alert", (p: any) => {
+            if (p.type === 'WIFI_OFF' || p.type === 'NETWORK_CHANGE' || p.type === 'CHEAT_ATTEMPT') {
+                toast(`${p.level === 'danger' ? '🚨' : '⚠️'} ${p.message}`);
+                addLog(p.message, p.level === 'danger' ? 'warn' : 'info');
+            }
+        });
 
         socket.on("student-connected", (p) => {
             if (p.role === "professor") return;
@@ -80,12 +118,98 @@ export default function ProfessorMonitor() {
             addLog(`استشعار غش: ${p.studentId} - ${detailsAR}`, 'warn');
         });
 
-        socket.on("submission-upserted", (p) => {
-            updateStudent(p.studentId, (prev) => ({
-                submittedFiles: [...(prev.submittedFiles || []), p.fileName]
-            }));
-            toast(`تم استلام ملف من ${p.studentId}`);
-            addLog(`تم استلام ملف: ${p.fileName} (من ${p.studentId})`, 'info');
+        // Initialize submission status from DB
+        apiFetch(`/exams/${id}/submissions`).then((data: any) => {
+            if (Array.isArray(data)) {
+                // Map matricule -> files array
+                const submittedByMatricule = new Map<string, { files: SubmittedFile[], isFinalized: boolean }>();
+                data.forEach(sub => {
+                    // Backend returns { matricule, isFinalized, files: [...] }
+                    const newFiles = (sub.files || []).map((f: any) => ({
+                        name: f.name,
+                        url: f.url,
+                        exists: f.exists
+                    }));
+
+                    const existing = submittedByMatricule.get(sub.matricule);
+                    const allFiles = existing ? [...existing.files, ...newFiles] : newFiles;
+
+                    submittedByMatricule.set(sub.matricule, {
+                        files: allFiles,
+                        isFinalized: !!sub.isFinalized
+                    });
+                });
+
+                // Update students
+                setStudents(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+                    Object.values(next).forEach(s => {
+                        if (s.matricule && submittedByMatricule.has(s.matricule)) {
+                            const data = submittedByMatricule.get(s.matricule)!;
+
+                            if (data.files.length !== s.submittedFiles.length || s.isFinalized !== data.isFinalized) {
+                                s.submittedFiles = data.files;
+                                s.isFinalized = data.isFinalized;
+                                changed = true;
+                            }
+                        }
+                    });
+                    return changed ? next : prev;
+                });
+            }
+        }).catch(() => { });
+
+        // Add handler for real-time finalization
+        socket.on("finalize-exam", (p: any) => {
+            // p = { examId, studentId, ... }
+            const sid = String(p.studentId);
+            updateStudent(sid, { isFinalized: true });
+            toast(`🎓 الطالب ${sid} أنهى الامتحان`);
+            addLog(`أنهى الامتحان: ${sid}`, 'info');
+        });
+
+        socket.on("file-submitted", (p) => {
+            // p contains: { workId, examId, studentId, files: [{ name, filename, path }], at }
+            // API upload returns 'filename' (disk name) and 'name' (original).
+            // We need to construct URL. URL pattern: /static/exams/{examId}/students/{matricule}/{filename}
+
+            // We need the student's matricule to build the URL or find the student to update.
+            // p.studentId is the DB ID (or socket ID? backend says studentId: id_etud which is DB ID usually).
+            // Wait, previous code treated p.studentId as the key in 'students' map.
+            // 'students' map keys come from 'studentsPresence' in backend which keys by socket.id usually?
+            // backend/sockets/index.js: studentsPresence.set(socket.id, { ... studentId: user.id ... })
+            // So students map is keyed by studentId (DB ID).
+
+            const sid = String(p.studentId);
+
+            setStudents(prev => {
+                const s = prev[sid];
+                if (!s) return prev; // Student not found in list (weird)
+
+                const newFiles: SubmittedFile[] = (p.files || []).map((f: any) => ({
+                    name: f.name,
+                    url: `/static/exams/${id}/students/${s.matricule}/${f.filename}`,
+                    exists: true
+                }));
+
+                // Avoid duplicates by checking URL or name
+                const combined = [...s.submittedFiles];
+                newFiles.forEach(nf => {
+                    if (!combined.find(cf => cf.url === nf.url)) {
+                        combined.push(nf);
+                    }
+                });
+
+                return {
+                    ...prev,
+                    [sid]: { ...s, submittedFiles: combined }
+                };
+            });
+
+            const fileName = p.files && p.files.length > 0 ? p.files[0].name : "ملف";
+            toast(`📥 استلام ملف جديد من ${p.studentId}`);
+            addLog(`تم استلام ملف: ${fileName} (من ${p.studentId})`, 'info');
         });
 
         socket.on("exam-tick", (p: any) => {
@@ -108,16 +232,20 @@ export default function ProfessorMonitor() {
         });
 
         return () => {
+            socket.off("update-student-list");
+            socket.off("alert");
             socket.off("student-connected");
             socket.off("student-disconnected");
             socket.off("student-offline");
             socket.off("cheat-alert");
-            socket.off("submission-upserted");
+            socket.off("file-submitted");
             socket.off("exam-tick");
             socket.off("exam-ended");
             socket.off("exam-stopped");
         };
     }, [id, socket]);
+
+    // ... (helper functions) ...
 
     function translateCheat(type: string, details: string) {
         if (type === "TAB_SWITCH") return "تبديل نافذة";
@@ -129,7 +257,9 @@ export default function ProfessorMonitor() {
 
     function updateStudent(studentId: string, changes: Partial<StudentState> | ((prev: StudentState) => Partial<StudentState>)) {
         setStudents((prev) => {
+            // Ensure submittedFiles is initialized as empty array if missing
             const current = prev[studentId] || { studentId, status: "offline", warnings: [], submittedFiles: [] };
+            // @ts-ignore - Partial<StudentState> complexity with new type
             const newVals = typeof changes === 'function' ? changes(current) : changes;
             return { ...prev, [studentId]: { ...current, ...newVals } };
         });
@@ -139,190 +269,244 @@ export default function ProfessorMonitor() {
         setLogs((prev) => [{ msg, type, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
     }
 
-    async function clearLogs() {
-        setShowClearLogsConfirm(true);
-    }
+    // ... (render) ...
 
-    async function handleClearLogsConfirmed() {
-        setShowClearLogsConfirm(false);
-        try {
-            await apiFetch(`/exams/${id}/logs/clear`, { method: "POST" });
-            setLogs([]);
-            // Plus optionnel: réinitialiser les warnings visuels des étudiants
-            setStudents(prev => {
-                const next = { ...prev };
-                Object.keys(next).forEach(k => { next[k].warnings = []; });
-                return next;
-            });
-            toast("✅ تم مسح السجل");
-        } catch (e) {
-            toast("❌ فشل مسح السجل");
-        }
-    }
-
-    const studentList = Object.values(students);
-    const onlineCount = studentList.filter(s => s.status === "online").length;
+    const onlineCount = Object.values(students).filter(s => s.status === 'online').length;
 
     return (
         <div dir="rtl" className="min-h-screen bg-slate-50 flex flex-col font-sans">
-            <header className="bg-white shadow-sm z-30 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            {/* Header */}
+            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
                 <div className="flex items-center gap-4">
                     <Link
                         href="/professor/dashboard"
                         className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                        title="Retour"
+                        title="رجوع"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </Link>
-                    <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                        🛡️ مراقبة مباشرة <span className="text-gray-300">|</span> <span className="text-primary-600">{examTitle || `Examen #${id}`}</span>
-                    </h1>
+                    <div className="bg-indigo-600 text-white p-2 rounded-xl">
+                        <span className="text-2xl font-bold">🎓</span>
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-black text-slate-800">{examTitle || 'مراقبة الامتحان'}</h1>
+                        <p className="text-xs text-slate-500 font-medium">لوحة التحكم المباشرة</p>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <Link href={`/professor/exams/${id}/submissions`} className="hidden md:flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold hover:bg-indigo-100 transition-all border border-indigo-100">
-                        📂 استعراض الملفات
-                    </Link>
-                    <div className="h-10 w-px bg-gray-200 mx-2 hidden md:block"></div>
-                    <div className="flex items-center gap-6">
-                        <div className="flex flex-col items-center">
-                            <span className="text-[10px] text-gray-400 font-bold uppercase">الوقت المتبقي</span>
-                            <span className={`text-2xl font-mono font-bold ${isEnded ? 'text-red-500' :
-                                timeLeftMs <= 60000 ? 'text-red-600 animate-pulse' :
-                                    timeLeftMs <= 300000 ? 'text-orange-500' :
-                                        'text-primary-600'}`}>
-                                {timerStr}
-                            </span>
-                        </div>
-
-                        <div className="h-10 w-px bg-gray-200" />
-
-                        <div className="flex gap-3">
-                            <div className="flex flex-col items-center px-4 py-1 bg-green-50 rounded-lg border border-green-100">
-                                <span className="text-xs text-green-600 font-bold uppercase">متصل</span>
-                                <span className="text-xl font-bold text-green-700 leading-none">{onlineCount}</span>
-                            </div>
-                            <div className="flex flex-col items-center px-4 py-1 bg-slate-100 rounded-lg border border-slate-200">
-                                <span className="text-xs text-slate-500 font-bold uppercase">كلي</span>
-                                <span className="text-xl font-bold text-slate-700 leading-none">{studentList.length}</span>
-                            </div>
-                        </div>
+                <div className="flex items-center gap-6">
+                    <div className={`px-4 py-2 rounded-xl font-mono text-xl font-bold tracking-widest ${isEnded ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-700'}`}>
+                        {timerStr}
                     </div>
+                    <Badge variant={isEnded ? 'danger' : 'success'}>{isEnded ? 'منتهي' : 'جاري'}</Badge>
                 </div>
             </header>
 
-            <ConfirmModal
-                isOpen={showClearLogsConfirm}
-                type="warning"
-                title="مسح سجل الأحداث"
-                message="هل أنت متأكد من رغبتك في مسح كافة التنبيهات؟ لا يمكن التراجع عن هذا الإجراء."
-                confirmText="نعم، امسح الكل"
-                cancelText="تراجع"
-                onConfirm={handleClearLogsConfirmed}
-                onCancel={() => setShowClearLogsConfirm(false)}
-            />
-
-            <div className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 overflow-hidden">
-                {/* Main Grid */}
-                <div className="lg:col-span-3 overflow-y-auto">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {studentList.map(s => {
-                            const isOnline = s.status === 'online';
-                            const hasWarnings = s.warnings.length > 0;
-                            const hasSubmitted = s.submittedFiles.length > 0;
-
-                            return (
-                                <Card key={s.studentId} className={`student-card relative overflow-hidden transition-all duration-300 border-2 ${hasWarnings ? 'cheating border-red-400 shadow-red-100' : isOnline ? 'connected border-green-400 shadow-green-50' : 'disconnected border-gray-200 opacity-70'}`}>
-                                    {hasWarnings && <div className="absolute top-0 left-0 w-full h-1.5 bg-red-500 animate-pulse"></div>}
-
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-inner ${hasWarnings ? 'bg-red-600' : isOnline ? 'bg-emerald-600' : 'bg-slate-400'}`}>
-                                                {s.matricule ? s.matricule.slice(-2) : '??'}
+            <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Visual Grid of Students */}
+                <div className="lg:col-span-3 space-y-6">
+                    <Card>
+                        <div className="mb-4 pb-2 border-b border-gray-100 flex justify-between items-center">
+                            <h3 className="font-bold text-lg text-slate-800">الممتحنين ({onlineCount}/{Object.keys(students).length})</h3>
+                        </div>
+                        {Object.keys(students).length === 0 ? (
+                            <div className="text-center py-20 opacity-50">
+                                <span className="text-6xl mb-4 block">👥</span>
+                                <p>بانتظار التحاق الطلبة...</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {Object.values(students)
+                                    .sort((a, b) => (a.status === 'online' ? -1 : 1))
+                                    .map(s => (
+                                        <div key={s.studentId} className={`relative p-4 rounded-2xl border-2 transition-all group ${s.status === 'online' ? 'bg-white border-indigo-100 shadow-sm hover:border-indigo-300' : s.status === 'no-wifi' ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100 opacity-70'}`}>
+                                            <div className="flex justify-between items-start mb-3">
+                                                <Badge variant={s.status === 'online' ? 'success' : s.status === 'no-wifi' ? 'warning' : 'default'}>
+                                                    {s.status === 'online' ? 'متصل' : s.status === 'no-wifi' ? 'لا يوجد إنترنت' : (s.submittedFiles && s.submittedFiles.length > 0) ? 'غير متصل' : 'غائب'}
+                                                </Badge>
+                                                <div className="text-left">
+                                                    <span className="block text-lg font-black text-slate-800 leading-tight">{s.matricule || '...'}</span>
+                                                    <span className="text-[10px] text-slate-400 font-mono">#{s.studentId}</span>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h3 className="font-bold text-slate-900 leading-tight">{s.matricule || "مجهول"}</h3>
-                                                <p className="text-[10px] text-slate-400 font-mono mt-0.5">{String(s.studentId).slice(0, 8)}</p>
+
+                                            {/* Warnings */}
+                                            {s.warnings && s.warnings.length > 0 && (
+                                                <div className="mb-3 space-y-1">
+                                                    {s.warnings.slice(-2).map((w, i) => (
+                                                        <div key={i} className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded flex items-center gap-1 animate-pulse">
+                                                            <span>⚠️</span> {w}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Submission Status */}
+                                            <div className={`mt-3 pt-3 border-t ${s.status === 'online' ? 'border-indigo-50' : 'border-slate-100'}`}>
+                                                {s.submittedFiles && s.submittedFiles.length > 0 ? (
+                                                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg mb-2">
+                                                        <span>📎</span>
+                                                        <span className="text-xs font-bold">{s.submittedFiles.length} ملفات</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2 text-slate-400 bg-slate-100 px-3 py-2 rounded-lg mb-2">
+                                                        <span>⏳</span>
+                                                        <span className="text-xs">لم يسلم بعد</span>
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    onClick={() => s.isFinalized ? setSelectedStudentForFiles(s) : null}
+                                                    disabled={!s.isFinalized}
+                                                    className={`w-full py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 ${s.isFinalized
+                                                        ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                                                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                                >
+                                                    {s.isFinalized ? '📂 عرض الملفات' : '⏳ الطالب لم ينهِ الامتحان'}
+                                                </button>
                                             </div>
                                         </div>
-                                        <Badge variant={isOnline ? 'success' : 'default'} animate={isOnline && !hasWarnings} className="text-[10px]">
-                                            {isOnline ? 'متصل' : 'غائب'}
-                                        </Badge>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        {hasWarnings ? (
-                                            <div className="bg-red-50 p-2 rounded text-red-700 text-xs font-bold flex items-center gap-2 border border-red-100">
-                                                ⚠️ {s.warnings.length} مخالفات
-                                            </div>
-                                        ) : (
-                                            <div className="bg-emerald-50 p-2 rounded-xl text-emerald-700 text-xs font-bold flex items-center gap-2 border border-emerald-100 opacity-70">
-                                                ✅ سجل نظيف
-                                            </div>
-                                        )}
-
-                                        {hasSubmitted ? (
-                                            <div className="bg-blue-50 p-2 rounded text-blue-700 text-xs font-bold flex items-center gap-2 border border-blue-100">
-                                                📎 {s.submittedFiles.length} ملفات
-                                            </div>
-                                        ) : (
-                                            <div className="bg-gray-50 p-2 rounded text-gray-400 text-xs flex items-center gap-2 border border-gray-100">
-                                                ⏳ لم يسلم بعد
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {hasWarnings && (
-                                        <div className="mt-2 pt-2 border-t border-red-100 text-[10px] text-red-500 truncate">
-                                            آخر: {s.warnings[s.warnings.length - 1].split('(')[0]}
-                                        </div>
-                                    )}
-                                </Card>
-                            );
-                        })}
-
-                        {studentList.length === 0 && (
-                            <div className="col-span-full py-20 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-300 rounded-3xl bg-white/50">
-                                <LoadingSpinner size="lg" className="mb-4 opacity-20" />
-                                <p className="text-lg font-medium">بانتظار انضمام الطلاب...</p>
-                                <p className="text-sm">سيظهرون هنا تلقائياً عند الدخول.</p>
+                                    ))}
                             </div>
                         )}
-                    </div>
+                    </Card>
                 </div>
 
-                <div className="lg:col-span-1 bg-white border border-gray-200 rounded-2xl shadow-sm h-[calc(100vh-140px)] flex flex-col overflow-hidden">
-                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                        <h3 className="font-bold text-gray-700 text-sm">سجل الأحداث</h3>
-                        <button
-                            onClick={clearLogs}
-                            className="text-[10px] bg-white px-2 py-1 rounded border border-gray-200 text-red-500 hover:bg-red-50 font-bold transition-colors"
-                        >
-                            🗑️ تفريغ
-                        </button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                        {logs.map((l, i) => (
-                            <div key={i} className={`p-3 rounded-xl text-xs border-r-4 animate-fade-in ${l.type === 'warn' ? 'bg-red-50 border-red-500 text-red-800' :
-                                l.type === 'success' ? 'bg-green-50 border-green-500 text-green-800' :
-                                    'bg-slate-50 border-slate-400 text-slate-700'
-                                }`}>
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="font-mono text-[9px] opacity-60">{l.time}</span>
-                                    {l.type === 'warn' && <span className="bg-red-100 text-red-600 px-1 rounded font-black">!</span>}
+                {/* Logs Sidebar */}
+                <div className="lg:col-span-1 h-[calc(100vh-8rem)] sticky top-24">
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+                        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                            <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                <span>📜</span> السجل
+                            </h3>
+                            <button onClick={() => setShowClearLogsConfirm(true)} className="text-[10px] text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors">
+                                مسح
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-3">
+                            {logs.length === 0 ? (
+                                <div className="text-center py-12 opacity-30">
+                                    <span className="text-4xl px-2">📭</span>
+                                    <p className="text-xs mt-2">لا يوجد نشاط</p>
                                 </div>
-                                <div className="font-bold leading-tight">{l.msg}</div>
-                            </div>
-                        ))}
-                        {logs.length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-20 text-gray-300">
-                                <span className="text-4xl mb-2">📭</span>
-                                <p className="text-xs">لا يوجد نشاط بعد</p>
-                            </div>
-                        )}
+                            ) : (
+                                logs.map((l, i) => (
+                                    <div key={i} className={`text-xs p-3 rounded-xl border relative overflow-hidden ${l.type === 'warn' ? 'bg-amber-50 border-amber-100 text-amber-800' : l.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-white border-slate-100 text-slate-600'}`}>
+                                        <div className="flex justify-between opacity-50 mb-1 font-mono text-[9px]">
+                                            <span>{l.time}</span>
+                                        </div>
+                                        <p className="font-medium leading-relaxed">{l.msg}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
+                </div>
+            </main>
+
+            {/* Modals */}
+            <FileViewerModal
+                isOpen={!!selectedStudentForFiles}
+                onClose={() => setSelectedStudentForFiles(null)}
+                studentData={selectedStudentForFiles}
+            />
+
+            <FilePreviewModal
+                file={previewFile}
+                onClose={() => setPreviewFile(null)}
+            />
+
+            <ConfirmModal
+                isOpen={showClearLogsConfirm}
+                title="مسح السجل"
+                message="هل أنت متأكد من مسح جميع السجلات؟"
+                confirmText="نعم، مسح"
+                cancelText="إلغاء"
+                type="danger"
+                onConfirm={() => {
+                    setLogs([]);
+                    setShowClearLogsConfirm(false);
+                }}
+                onCancel={() => setShowClearLogsConfirm(false)}
+            />
+        </div >
+    );
+}
+
+// Update StudentState interface (usually implied, but good to be explicit in mind or if defined elsewhere)
+// But here I'll just update the component usage.
+
+function FileViewerModal({ isOpen, onClose, studentData }: { isOpen: boolean, onClose: () => void, studentData: StudentState | null }) {
+    if (!isOpen || !studentData) return null;
+    const { submittedFiles, studentId, matricule } = studentData;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-slide-up" dir="rtl">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-50/50">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            📂 ملفات الطالب <span className="text-indigo-600">{matricule || studentId}</span>
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-1">المعرف: {studentId}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
+                        ✖
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto custom-scrollbar space-y-3">
+                    {submittedFiles.length === 0 ? (
+                        <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl">
+                            <span className="text-4xl opacity-30">📭</span>
+                            <p className="text-slate-400 font-bold mt-2">لا توجد ملفات مسلمة بعد</p>
+                        </div>
+                    ) : (
+                        submittedFiles.map((file, idx) => (
+                            <div key={idx} className={`flex items-center justify-between p-4 border rounded-2xl transition-all group ${file.exists !== false ? 'bg-slate-50 border-slate-100 hover:bg-indigo-50 hover:border-indigo-100' : 'bg-red-50 border-red-100 opacity-75'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-sm ${file.exists !== false ? 'bg-white' : 'bg-red-100 text-red-500'}`}>
+                                        {file.exists !== false ? '📄' : '🚫'}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-slate-700 text-sm truncate max-w-[200px]">{file.name}</p>
+                                        <div className="flex gap-2">
+                                            <span className="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">ملف تم تسليمه</span>
+                                            {file.exists === false && (
+                                                <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-bold">ملف محذوف من السيرفر</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <>
+                                        <button
+                                            onClick={() => setPreviewFile(file)}
+                                            className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-200 transition-colors"
+                                        >
+                                            عرض
+                                        </button>
+                                        <a
+                                            href={`${baseUrl}${file.url}`}
+                                            download
+                                            className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors"
+                                        >
+                                            تحميل
+                                        </a>
+                                    </>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                    <button onClick={onClose} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-all shadow-lg hover:shadow-slate-300/50">
+                        إغلاق
+                    </button>
                 </div>
             </div>
         </div>
     );
 }
+

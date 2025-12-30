@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { getSocket } from "@/lib/socket";
 import { toast } from "@/components/ui/Toast";
-import { baseUrl } from "@/lib/api";
+import { baseUrl, apiFetch } from "@/lib/api";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type Exam = {
@@ -25,6 +25,7 @@ export default function ProfessorDashboard() {
   const [students, setStudents] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [selectedStudentLogs, setSelectedStudentLogs] = useState<any>(null);
 
   useEffect(() => {
     if (!socket) return;
@@ -33,17 +34,35 @@ export default function ProfessorDashboard() {
 
     const onUpdateStudents = (list: any[]) => setStudents(list);
     const onAlert = (alert: any) => {
-      setAlerts(prev => [alert, ...prev].slice(0, 10)); // Keep last 10
+      setAlerts(prev => [alert, ...prev].slice(0, 50)); // Keep last 50
       // Play sound if critical
       if (alert.level === 'danger') {
-        const audio = new Audio('/alert.mp3'); // Assuming file exists or just visual
+        const audio = new Audio('/alert.mp3');
         audio.play().catch(() => { });
+        toast(alert.message);
+      } else if (alert.type === 'CANCELLED') {
+        toast(alert.message || `Submission cancelled by ${alert.matricule}`);
+      } else {
+        toast(alert.message);
       }
-      toast(alert.message); // Also show toast
+    };
+
+    const onSubmissionUpdate = (data: any) => {
+      if (data.type === 'CANCELLED') {
+        toast(`⚠️ Submission cancelled: ${data.matricule} (Work #${data.workId})`);
+        // Optionally update alerts list
+        setAlerts(prev => [{
+          type: 'CANCELLED',
+          message: `⚠️ Submission cancelled by ${data.matricule}`,
+          level: 'warning',
+          time: new Date().toLocaleTimeString()
+        }, ...prev]);
+      }
     };
 
     socket.on('update-student-list', onUpdateStudents);
     socket.on('alert', onAlert);
+    socket.on('professor:submission-update', onSubmissionUpdate);
 
     // Track connection status
     setIsConnected(socket.connected);
@@ -78,11 +97,8 @@ export default function ProfessorDashboard() {
 
   async function fetchResources(id: number) {
     try {
-      const res = await fetch(`${baseUrl}/exams/${id}/resources`);
-      if (res.ok) {
-        const data = await res.json();
-        setResourcesMap(prev => ({ ...prev, [id]: data }));
-      }
+      const data = await apiFetch<any[]>(`/exams/${id}/resources`);
+      setResourcesMap(prev => ({ ...prev, [id]: data || [] }));
     } catch (e) {
       console.error("Error fetching resources:", e);
     }
@@ -236,21 +252,10 @@ export default function ProfessorDashboard() {
   async function loadExams() {
     try {
       setLoading(true);
-      const url = `${baseUrl}/exams`;
-      console.log("Fetching:", url);
-      const res = await fetch(url)
-
-      // 🔴 important : tester le status HTTP
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status} - ${text}`);
-      }
-
-      const data = await res.json();
+      const data = await apiFetch<Exam[]>("/exams");
       setExams(Array.isArray(data) ? data : []);
-
     } catch (error) {
-      console.error("❌ loadExams error:", error); // 👈 console ici
+      console.error("❌ loadExams error:", error);
       toast("Impossible de charger les examens");
     } finally {
       setLoading(false);
@@ -332,13 +337,10 @@ export default function ProfessorDashboard() {
     setCreating(true);
     try {
       const end = new Date(Date.now() + duration * 60000).toISOString();
-      const res = await fetch(`${baseUrl}/exams`, {
+      const created = await apiFetch<any>("/exams", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ titre, description, date_fin: end }),
       });
-      if (!res.ok) throw new Error("fail");
-      const created = await res.json();
       toast("Examen créé ✅");
       setTitre("");
       setDescription("");
@@ -361,8 +363,7 @@ export default function ProfessorDashboard() {
   async function confirmDelete() {
     if (!examToDelete) return;
     try {
-      const res = await fetch(`${baseUrl}/exams/${examToDelete}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error("Erreur suppression");
+      await apiFetch(`/exams/${examToDelete}`, { method: 'DELETE' });
       toast("Examen supprimé 🗑️");
       loadExams();
     } catch {
@@ -392,14 +393,22 @@ export default function ProfessorDashboard() {
   // upload (sujet + pièces)
   async function uploadResources(examId: number, form: HTMLFormElement) {
     const fd = new FormData(form);
-    const res = await fetch(`${baseUrl}/exams/${examId}/resources`, {
-      method: "POST",
-      body: fd,
-    });
-    if (!res.ok) return toast("Upload échoué");
-    toast("Fichiers importés ✅");
-    (form as any).reset();
-    fetchResources(examId); // Refresh the list
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${baseUrl}/exams/${examId}/resources`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: fd,
+      });
+      if (!res.ok) return toast("Upload échoué");
+      toast("Fichiers importés ✅");
+      (form as any).reset();
+      fetchResources(examId); // Refresh the list
+    } catch (e) {
+      toast("Upload erreur");
+    }
   }
 
   return (
@@ -473,41 +482,88 @@ export default function ProfessorDashboard() {
                     'bg-blue-50 border-blue-500 text-blue-800'
                   }`}>
                   <div className="font-bold">{alert.type}</div>
-                  <div>{alert.message}</div>
+                  <div className={alert.type === 'NETWORK_CHANGE' || alert.type === 'WIFI_OFF' ? 'font-black' : ''}>{alert.message}</div>
                 </div>
               ))}
             </div>
           </div>
 
           {/* CONNECTED STUDENTS PANEL */}
-          <div className="md:col-span-2 bg-white/90 backdrop-blur rounded-3xl shadow-lg border border-indigo-50 p-4 h-80 overflow-y-auto">
-            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-              👨‍🎓 الطلاب المتصلين بالقاعة
-              <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">{students.length}</span>
+          <div className="md:col-span-2 bg-white/90 backdrop-blur rounded-3xl shadow-lg border border-indigo-50 p-6 h-96 overflow-y-auto flex flex-col">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                👨‍🎓 Students Live Monitoring
+                <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">{students.length}</span>
+              </span>
+              <div className="flex gap-2 text-[10px] font-bold">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Connected</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Cheat/Error</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Finalized</span>
+              </div>
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {students.map((s, i) => (
-                <div key={i} className={`p-3 rounded-xl border flex flex-col items-center text-center transition-all ${s.status === 'cheating' ? 'bg-red-50 border-red-500 ring-2 ring-red-200' :
-                  s.status?.includes('disconnected') ? 'bg-gray-100 border-gray-300 opacity-60' :
-                    'bg-green-50 border-green-500'
-                  }`}>
-                  <div className="text-2xl mb-1">{s.status === 'cheating' ? '🚨' : '👤'}</div>
-                  <div className="font-bold text-sm truncate w-full text-slate-900" title={s.name}>{s.name}</div>
-                  <div className="text-xs text-slate-500">{s.matricule}</div>
-                  <div className="text-[10px] mt-1 px-1.5 py-0.5 rounded bg-white border text-slate-700 font-mono">
-                    {s.ip?.replace('::ffff:', '')}
-                  </div>
-                  <div className={`text-[10px] font-bold mt-1 ${s.status === 'cheating' ? 'text-red-600' :
-                    s.status === 'connected' ? 'text-green-600' :
-                      'text-gray-400'
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {students.map((s, i) => {
+                const isCheating = s.status === 'cheating'; // Or derive from alerts
+                const isOffline = s.status === 'offline' || s.status?.includes('disconnected');
+                const isFinalized = s.status === 'finalized';
+
+                return (
+                  <div key={i} className={`relative p-4 rounded-2xl border transition-all duration-300 group overflow-hidden ${isCheating ? 'bg-red-50 border-red-500 shadow-lg shadow-red-100 animate-pulse' :
+                    isFinalized ? 'bg-blue-50 border-blue-500' :
+                      isOffline ? 'bg-slate-50 border-slate-200 opacity-70' :
+                        'bg-white border-indigo-100 hover:border-indigo-400 hover:shadow-md'
                     }`}>
-                    {s.status === 'connected' ? 'متصل' : s.status === 'disconnected' ? 'غير متصل' : s.status}
+                    {/* Visual Indicator Layer for Cheating */}
+                    {isCheating && <div className="absolute inset-0 border-4 border-red-500/50 rounded-2xl animate-ping opacity-20 pointer-events-none"></div>}
+
+                    <div className="flex items-start justify-between mb-2">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-sm ${isCheating ? 'bg-red-100 text-red-600' :
+                        isFinalized ? 'bg-blue-100 text-blue-600' :
+                          isOffline ? 'bg-slate-200 text-slate-500' :
+                            'bg-indigo-100 text-indigo-600'
+                        }`}>
+                        {isCheating ? '🚨' : isFinalized ? '🎓' : isOffline ? '🔌' : '👨‍🎓'}
+                      </div>
+                      <div className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${isCheating ? 'bg-red-500 text-white' :
+                        isFinalized ? 'bg-blue-500 text-white' :
+                          isOffline ? 'bg-slate-500 text-white' :
+                            'bg-emerald-500 text-white'
+                        }`}>
+                        {s.status}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-slate-800 text-sm truncate" title={s.name}>{s.name}</h4>
+                      <p className="font-mono text-xs text-slate-500">{s.matricule}</p>
+
+                      {s.ip && (
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                          <span className="truncate">{s.ip.replace('::ffff:', '')}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <button
+                        onClick={() => setSelectedStudentLogs(s)}
+                        className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 flex items-center gap-1 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                        View Logs
+                      </button>
+                      {isFinalized && <span className="text-xs text-blue-500">✔️ Done</span>}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+
               {students.length === 0 && (
-                <div className="col-span-full text-center text-gray-400 py-10">
-                  في انتظار اتصال الطلاب بالشبكة...
+                <div className="col-span-full flex flex-col items-center justify-center text-gray-400 py-12 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
+                  <span className="text-4xl mb-2 opacity-30">👥</span>
+                  <p>Waiting for students to join...</p>
                 </div>
               )}
             </div>
@@ -852,40 +908,73 @@ export default function ProfessorDashboard() {
           </span>
         </p>
 
-        {/* CONFIRM DELETE MODAL */}
-        {examToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
-              <div className="text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100 mb-4">
-                  <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">
-                  إزالة الامتحان نهائياً؟
+        {/* STUDENT LOGS MODAL */}
+        {selectedStudentLogs && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200">
+              <div className="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 className="text-xl font-bold text-gray-900 border-r-4 border-indigo-500 pr-3">
+                  سجلات الطالب: {selectedStudentLogs.name}
                 </h3>
-                <p className="text-sm text-gray-500 mb-6">
-                  هل أنت متأكد من حذف هذا الامتحان؟ سيتم مسح كافة البيانات والملفات المرفقة ولن تتمكن من استعادتها.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setExamToDelete(null)}
-                    className="w-full justify-center rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-200 transition-colors"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    className="w-full justify-center rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-colors"
-                  >
-                    حذف نهائي
-                  </button>
-                </div>
+                <button
+                  onClick={() => setSelectedStudentLogs(null)}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="max-h-[400px] overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+                {selectedStudentLogs.history && selectedStudentLogs.history.length > 0 ? (
+                  [...selectedStudentLogs.history].reverse().map((log: any, idx: number) => (
+                    <div key={idx} className={`p-3 rounded-xl border-r-4 text-right ${log.type === 'RESEAU_SUSPECT' ? 'bg-orange-50 border-orange-500' :
+                      log.type === 'FRAUDE' ? 'bg-red-50 border-red-500 font-bold' :
+                        log.type === 'WIFI_PERDU' ? 'bg-yellow-50 border-yellow-500' :
+                          'bg-slate-50 border-slate-300'
+                      }`}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-mono text-slate-500">{log.at}</span>
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${log.type === 'RESEAU_SUSPECT' ? 'bg-orange-200 text-orange-800' :
+                          log.type === 'FRAUDE' ? 'bg-red-200 text-red-800' :
+                            log.type === 'WIFI_PERDU' ? 'bg-yellow-200 text-yellow-800' :
+                              'bg-slate-200 text-slate-700'
+                          }`}>
+                          {log.type}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-800">{log.message}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-400 py-10">لا توجد سجلات حالياً</p>
+                )}
+              </div>
+
+              <div className="mt-6">
+                <button
+                  onClick={() => setSelectedStudentLogs(null)}
+                  className="w-full bg-slate-900 text-white rounded-xl py-3 font-bold hover:bg-black transition-all"
+                >
+                  إغلاق
+                </button>
               </div>
             </div>
           </div>
         )}
+
+        {/* CONFIRM DELETE MODAL */}
+        <ConfirmModal
+          isOpen={!!examToDelete}
+          type="danger"
+          title="حذف الامتحان"
+          message="هل أنت متأكد من رغبتك في حذف هذا الامتحان نهائياً؟ سيتم مسح كافة البيانات المرتبطة به."
+          confirmText="نعم، احذف"
+          cancelText="إلغاء"
+          onConfirm={confirmDelete}
+          onCancel={() => setExamToDelete(null)}
+        />
       </div>
     </div >
   );
