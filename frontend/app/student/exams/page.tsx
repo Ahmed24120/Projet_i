@@ -7,8 +7,8 @@ import { apiFetch } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Input } from "@/components/ui/Input";
 import { toast } from "@/components/ui/Toast";
 
 type Exam = {
@@ -25,6 +25,7 @@ export default function StudentExams() {
   const [loading, setLoading] = useState(true);
   const [activeExamsMap, setActiveExamsMap] = useState<Record<number, number>>({});
   const [user, setUser] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -40,7 +41,6 @@ export default function StudentExams() {
 
     loadExams(token);
 
-    // ✅ Écouter les mises à jour d'examens en temps réel
     const socket = getSocket();
 
     socket.on("initial-sync", ({ activeExams }) => {
@@ -80,11 +80,13 @@ export default function StudentExams() {
 
   async function loadExams(token: string) {
     try {
-      const data = await apiFetch<Exam[]>("/exams", {}, token);
+      const room = localStorage.getItem("roomNumber");
+      const url = room ? `/exams?roomNumber=${room}` : "/exams";
+      const data = await apiFetch<Exam[]>(url, {}, token);
       setExams(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
-      toast("خطأ في تحميل الامتحانات");
+      toast("Erreur lors du chargement des examens");
     } finally {
       setLoading(false);
     }
@@ -98,80 +100,91 @@ export default function StudentExams() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-white">
         <LoadingSpinner size="lg" />
       </div>
     );
   }
 
+  const filteredExams = exams.filter(ex =>
+    ex.titre.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div dir="rtl" className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 p-4 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
-        <header className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+
+        {/* Header */}
+        <header className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-sky-100">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-xl font-bold border border-primary-200">
-              {user?.prenom?.[0] || "S"}
+            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+              {user?.prenom?.[0] || "E"}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">أهلاً بك، {user?.prenom || "طالب"} 👋</h1>
-              <p className="text-sm text-gray-500 flex items-center gap-2">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent">
+                Bienvenue, {user?.prenom || "Étudiant"} 👋
+              </h1>
+              <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                {user?.matricule ? `رقم الطالب: ${user.matricule}` : "طالب مسجل"}
+                {user?.matricule ? `Matricule : ${user.matricule}` : "Compte Étudiant"}
               </p>
             </div>
           </div>
-          <Button onClick={logout} className="bg-red-600 text-white hover:bg-red-700 border border-red-700 font-semibold shadow-md">
-            تسجيل خروج
+          <Button onClick={logout} variant="danger" className="shadow-md hover:shadow-lg transition-all">
+            Déconnexion
           </Button>
         </header>
 
         <section>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <span className="text-2xl">📚</span> الامتحانات المتاحة
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-3">
+              <span className="text-4xl">📚</span> Examens Disponibles
             </h2>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="بحث عن امتحان..."
-                  className="pl-4 pr-10 py-2 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 w-full sm:w-64 transition-all text-gray-900"
-                  onChange={(e) => { /* TODO: Implement search logic */ }}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-              </div>
-              <div className="flex gap-2">
-                <button className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-semibold shadow-md shadow-primary-500/20">الكل</button>
-                <button className="px-4 py-2 rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 text-sm font-semibold transition-colors">نشط</button>
-                <button className="px-4 py-2 rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 text-sm font-semibold transition-colors">منتهي</button>
-              </div>
+            <div className="w-full md:w-auto md:min-w-[300px]">
+              <Input
+                placeholder="Rechercher un examen..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full border-sky-200 focus:border-sky-400 focus:ring-sky-400"
+                fullWidth
+              />
             </div>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {exams.filter(ex => !!activeExamsMap[ex.id]).map((exam) => {
+            {filteredExams.map((exam) => {
+              const isActive = !!activeExamsMap[exam.id];
               return (
-                <Card key={exam.id} hoverEffect className="flex flex-col h-full border-t-4 border-t-green-500">
-                  <div className="flex-1">
+                <Card key={exam.id} hover className={`flex flex-col h-full border-t-4 shadow-lg hover:shadow-xl transition-all duration-300 bg-white ${isActive ? 'border-t-sky-500' : 'border-t-gray-300'}`}>
+                  <div className="flex-1 p-6">
                     <div className="flex justify-between items-start mb-4">
-                      <Badge className="bg-green-100 text-green-700">متاح الآن</Badge>
-                      <span className="text-xs text-gray-400">#{exam.id}</span>
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isActive ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {isActive ? '🟢 En cours' : '⏳ Disponible'}
+                      </span>
+                      <span className="text-xs text-gray-500 font-mono bg-gray-50 px-2 py-1 rounded">#{exam.id}</span>
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{exam.titre}</h3>
-                    <p className="text-sm text-gray-500 line-clamp-3 mb-6">
-                      {exam.description || "لا يوجد وصف متاح لهذا الامتحان."}
+                    <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2 flex-wrap">
+                      {exam.titre}
+                      {(exam as any).room_number && (
+                        <span className="text-xs bg-sky-100 text-sky-700 px-2 py-1 rounded-full font-semibold">
+                          🚪 Salle {(exam as any).room_number}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-sm text-gray-600 line-clamp-3 mb-6 leading-relaxed">
+                      {exam.description || "Aucune description disponible pour cet examen."}
                     </p>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-100 mt-auto">
-                    <div className="flex items-center justify-between mb-4 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">⏱️ جاري</span>
-                      <span className="flex items-center gap-1">🔒 مراقب</span>
+                  <div className="p-6 pt-0 mt-auto">
+                    <div className="flex items-center justify-between mb-4 text-xs font-medium text-gray-500">
+                      <span className="flex items-center gap-1">⏱️ Temps réel</span>
+                      <span className="flex items-center gap-1">🔒 Sécurisé</span>
                     </div>
                     <Link href={`/student/exams/${exam.id}`} className="block">
-                      <Button className="w-full bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-500/20">
-                        انضم للامتحان ✍️
+                      <Button className="w-full bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-blue-600 shadow-md hover:shadow-lg transition-all" size="lg">
+                        Rejoindre l'examen ✍️
                       </Button>
                     </Link>
                   </div>
@@ -179,11 +192,17 @@ export default function StudentExams() {
               )
             })}
 
-            {exams.filter(ex => !!activeExamsMap[ex.id]).length === 0 && (
-              <div className="col-span-full py-16 text-center bg-white rounded-2xl border-2 border-dashed border-gray-200">
-                <div className="text-6xl mb-4">🎉</div>
-                <h3 className="text-lg font-bold text-gray-900">لا يوجد امتحانات حالياً</h3>
-                <p className="text-gray-500">استمتع بوقتك! ستظهر الامتحانات هنا عند نشرها.</p>
+            {exams.length === 0 && (
+              <div className="col-span-full py-20 text-center bg-white/80 backdrop-blur-sm rounded-3xl border-2 border-dashed border-sky-200 shadow-lg">
+                <div className="text-6xl mb-6 opacity-80">📚</div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">Aucun examen disponible</h3>
+                <p className="text-gray-600">Les examens de votre salle apparaîtront ici une fois créés.</p>
+              </div>
+            )}
+
+            {exams.length > 0 && filteredExams.length === 0 && (
+              <div className="col-span-full py-12 text-center text-gray-600 bg-white/50 rounded-xl">
+                Aucun examen ne correspond à votre recherche.
               </div>
             )}
           </div>

@@ -91,7 +91,7 @@ function initSocket(server) {
             addStudentLog(studentId, 'RESEAU_SUSPECT', `Changement d'IP détecté : ${oldIp} -> ${clientIp} (Données mobiles ?)`);
             io.to('professors').emit('alert', {
               type: 'NETWORK_CHANGE',
-              message: `⚠️ تغيير شبكة مشبوه للطالب ${matricule || studentId} (من ${oldIp} إلى ${clientIp})`,
+              message: `⚠️ Changement de réseau suspect pour l'étudiant ${matricule || studentId} (de ${oldIp} à ${clientIp})`,
               level: 'warning',
               studentId
             });

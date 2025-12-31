@@ -63,7 +63,7 @@ export default function ExamRoom() {
 
         socket.on("exam-started", ({ endAt: endT }) => {
             setEndAt(endT);
-            toast("🚀 الامتحان بدأ! بالتوفيق للجميع.");
+            toast("🚀 L'examen a commencé ! Bonne chance à tous.");
         });
 
         socket.on("exam-tick", (p: any) => {
@@ -82,29 +82,29 @@ export default function ExamRoom() {
 
         socket.on("exam-ended", () => {
             setIsEnded(true);
-            setTimeLeftStr("انتهى");
+            setTimeLeftStr("Terminé");
             setProgress(0);
-            toast("⏱️ انتهى وقت الامتحان! سيتم إغلاق البوابة.");
+            toast("⏱️ Temps écoulé ! L'examen est terminé.");
         });
 
         socket.on("exam-stopped", () => {
             setIsEnded(true);
-            setTimeLeftStr("توقف");
-            toast("⏹️ تم إيقاف الامتحان من قبل الأستاذ.");
+            setTimeLeftStr("Arrêté");
+            toast("⏹️ L'examen a été arrêté par le professeur.");
         });
 
         socket.on("exam-warning", () => {
-            toast("⚠️ تنبيه: بقي 5 دقائق فقط!");
+            toast("⚠️ Attention : Il ne reste que 5 minutes !");
         });
 
         // Network status detection
         const handleOnline = () => {
             socket.emit("network-status", { studentId: user.matricule || user.id, online: true });
-            toast("📡 تم استعادة الاتصال بالإنترنت.");
+            toast("📡 Connexion Internet rétablie.");
         };
         const handleOffline = () => {
             socket.emit("network-status", { studentId: user.matricule || user.id, online: false });
-            toast("⚠️ انقطع الاتصال بالإنترنت! يرجى التحقق من الشبكة.");
+            toast("⚠️ Connexion Internet perdue ! Vérifiez votre réseau.");
         };
 
         window.addEventListener("online", handleOnline);
@@ -130,7 +130,7 @@ export default function ExamRoom() {
 
     function toggleFullScreen() {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().then(() => setIsFullScreen(true)).catch(() => toast("الملء التلقائي غير مدعوم"));
+            document.documentElement.requestFullscreen().then(() => setIsFullScreen(true)).catch(() => toast("Plein écran non supporté"));
         } else {
             document.exitFullscreen().then(() => setIsFullScreen(false));
         }
@@ -140,7 +140,7 @@ export default function ExamRoom() {
         e.preventDefault();
 
         if (!selectedFiles || selectedFiles.length === 0) {
-            toast("⚠️ يرجى اختيار ملف أولاً قبل الإرسال.");
+            toast("⚠️ Veuillez d'abord sélectionner un fichier.");
             return;
         }
 
@@ -165,7 +165,7 @@ export default function ExamRoom() {
             });
             if (res.ok) {
                 const data = await res.json();
-                toast("✅ تم استلام إجابتك بنجاح!");
+                toast("✅ Votre réponse a été reçue avec succès !");
 
                 const newSubmissions = data.files.map((f: any) => ({
                     id: data.workId,
@@ -179,10 +179,10 @@ export default function ExamRoom() {
                 (e.target as any).reset();
             } else {
                 const err = await res.json();
-                toast(`❌ ${err.error || "فشل الإرسال"}`);
+                toast(`❌ ${err.error || "Échec de l'envoi"}`);
             }
         } catch {
-            toast("خطأ في الشبكة");
+            toast("Erreur réseau");
         } finally {
             setIsUploading(false);
         }
@@ -200,10 +200,10 @@ export default function ExamRoom() {
                 socket.emit("submission:cancelled", { examId: id, workId });
 
                 setSubmittedFiles(prev => prev.filter((_, i) => i !== index));
-                toast("🗑️ تم إلغاء التسليم بنجاح.");
+                toast("🗑️ Soumission annulée avec succès.");
             }
         } catch (_) {
-            toast("خطأ في حذف الملف");
+            toast("Erreur lors de la suppression");
         }
     }
 
@@ -213,39 +213,39 @@ export default function ExamRoom() {
         setIsFinalized(true);
         setIsEnded(true);
         setShowFinalizeConfirm(false);
-        toast("📊 تم إنهاء الامتحان وتثبيت الإجابات.");
+        toast("📊 Examen terminé et réponses validées.");
     }
 
     if (!exam) return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>;
 
     return (
-        <div dir="rtl" className="min-h-screen bg-[#f8fafc] flex flex-col font-sans overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-50 flex flex-col font-sans overflow-hidden">
             {/* Premium Header */}
-            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 px-8 py-4 flex items-center justify-between border-b border-slate-200">
+            <header className="bg-white/90 backdrop-blur-md sticky top-0 z-50 px-8 py-4 flex items-center justify-between border-b border-sky-200 shadow-lg">
                 <div className="flex items-center gap-5">
                     <Link
                         href="/student/exams"
-                        className="p-2.5 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all border border-slate-200 shadow-sm"
-                        title="رجوع للقائمة"
+                        className="p-2.5 rounded-2xl bg-sky-100 text-sky-600 hover:bg-sky-200 transition-all shadow-sm"
+                        title="Retour à la liste"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </Link>
-                    <div className="h-12 w-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-indigo-100">🎓</div>
+                    <div className="h-12 w-12 bg-gradient-to-br from-sky-400 to-blue-500 rounded-2xl flex items-center justify-center text-2xl shadow-md text-white">🎓</div>
                     <div>
-                        <h1 className="font-black text-slate-900 text-xl tracking-tight">{exam.titre}</h1>
+                        <h1 className="font-black bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent text-xl tracking-tight">{exam.titre}</h1>
                         <div className="flex items-center gap-2 mt-0.5">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">امتحان جاري الآن</p>
+                            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Examen en cours</p>
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-8">
-                    <div className="bg-slate-900 text-white px-6 py-2.5 rounded-2xl shadow-lg shadow-slate-200 flex flex-col items-center min-w-[140px]">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">الوقت المتبقي</span>
-                        <div className={`text-2xl font-mono font-black tracking-tighter tabular-nums ${isEnded ? 'text-red-500' :
-                            timeLeftMs <= 60000 ? 'text-red-400 animate-pulse' :
-                                timeLeftMs <= 300000 ? 'text-orange-400' :
+                    <div className="bg-gradient-to-br from-sky-600 to-blue-600 text-white px-6 py-2.5 rounded-2xl shadow-lg flex flex-col items-center min-w-[140px]">
+                        <span className="text-[9px] font-black text-sky-200 uppercase tracking-[0.2em] mb-1">Temps restant</span>
+                        <div className={`text-2xl font-mono font-black tracking-tighter tabular-nums ${isEnded ? 'text-red-300' :
+                            timeLeftMs <= 60000 ? 'text-red-300 animate-pulse' :
+                                timeLeftMs <= 300000 ? 'text-orange-300' :
                                     'text-white'
                             }`}>
                             {timeLeftStr}
@@ -255,17 +255,17 @@ export default function ExamRoom() {
                     <div className="flex items-center gap-3">
                         <Button
                             onClick={toggleFullScreen}
-                            className={`hidden md:flex rounded-2xl font-bold border-2 transition-all ${isFullScreen ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-white border-indigo-100 text-indigo-600 hover:border-indigo-600'}`}
+                            className={`hidden md:flex rounded-2xl font-bold border-2 transition-all shadow-sm ${isFullScreen ? 'bg-gray-100 border-gray-200 text-gray-600' : 'bg-white border-sky-200 text-sky-600 hover:border-sky-400 hover:bg-sky-50'}`}
                         >
-                            {isFullScreen ? 'تصغير' : 'ملء الشاشة'}
+                            {isFullScreen ? 'Réduire' : 'Plein écran'}
                         </Button>
 
                         <button
                             onClick={() => setShowLogoutConfirm(true)}
-                            className="h-12 w-12 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-500 hover:text-white transition-all duration-300 flex items-center justify-center border-2 border-red-100 hover:border-red-600 shadow-sm"
-                            title="تسجيل الخروج"
+                            className="px-4 py-2 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-500 hover:text-white transition-all duration-300 flex items-center gap-2 border-2 border-red-100 hover:border-red-600 shadow-sm text-sm"
+                            title="Déconnexion"
                         >
-                            <span className="text-xl">🚪</span>
+                            Quitter
                         </button>
                     </div>
                 </div>
@@ -274,10 +274,10 @@ export default function ExamRoom() {
             <ConfirmModal
                 isOpen={showLogoutConfirm}
                 type="danger"
-                title="تسجيل الخروج"
-                message="هل أنت متأكد من رغبتك في الخروج من الامتحان؟"
-                confirmText="نعم، خروج"
-                cancelText="بقاء"
+                title="Déconnexion"
+                message="Êtes-vous sûr de vouloir quitter l'examen ?"
+                confirmText="Oui, quitter"
+                cancelText="Rester"
                 onConfirm={() => {
                     localStorage.removeItem("token");
                     localStorage.removeItem("user");
@@ -289,10 +289,10 @@ export default function ExamRoom() {
             <ConfirmModal
                 isOpen={showFinalizeConfirm}
                 type="warning"
-                title="إنهاء الامتحان"
-                message="هل أنت متأكد من إنهاء الامتحان؟ لا يمكنك التعديل أو إرسال ملفات جديدة بعد هذه الخطوة."
-                confirmText="نعم، إنهاء نهائي"
-                cancelText="تراجع"
+                title="Terminer l'examen"
+                message="Êtes-vous sûr de vouloir terminer l'examen ? Vous ne pourrez plus modifier ou envoyer de nouveaux fichiers après cette étape."
+                confirmText="Oui, terminer"
+                cancelText="Annuler"
                 onConfirm={finalizeExam}
                 onCancel={() => setShowFinalizeConfirm(false)}
             />
@@ -302,18 +302,18 @@ export default function ExamRoom() {
 
                 {/* Column 1: Resources (Right/Side) */}
                 <div className="col-span-12 lg:col-span-3 space-y-6 order-last lg:order-none">
-                    <Card className="p-6 border-none bg-white shadow-xl shadow-slate-100 rounded-[2rem] border border-slate-100">
-                        <h3 className="text-sm font-black text-slate-800 mb-6 flex items-center justify-between">
+                    <Card className="p-6 border-none bg-white shadow-xl rounded-[2rem] border border-sky-100">
+                        <h3 className="text-sm font-black bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent mb-6 flex items-center justify-between">
                             <span className="flex items-center gap-3">
-                                <span className="p-2 bg-indigo-50 rounded-xl text-lg">📄</span>
-                                موضوع الامتحان
+                                <span className="p-2 bg-sky-50 rounded-xl text-lg">📄</span>
+                                Sujet d'examen
                             </span>
                         </h3>
                         {exam.sujet_path ? (
                             <div className="space-y-4">
-                                <div className="bg-slate-50 p-5 rounded-2xl border-2 border-dashed border-slate-200 text-center group transition-all hover:border-indigo-400">
+                                <div className="bg-sky-50 p-5 rounded-2xl border-2 border-dashed border-sky-200 text-center group transition-all hover:border-sky-400">
                                     <span className="text-4xl block mb-3 group-hover:scale-110 transition-transform">📄</span>
-                                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-tight truncate">المستند الرئيسي للامتحان</p>
+                                    <p className="text-[11px] font-bold text-gray-600 uppercase tracking-tight truncate">Document principal</p>
                                 </div>
                                 <button
                                     disabled={isUploading}
@@ -333,45 +333,45 @@ export default function ExamRoom() {
                                             document.body.appendChild(a);
                                             a.click();
                                             a.remove();
-                                        } catch (error) { toast("خطأ في التحميل"); }
+                                        } catch (error) { toast("Erreur de téléchargement"); }
                                         finally { setIsUploading(false); }
                                     }}
-                                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-3 active:scale-95"
+                                    className="w-full py-4 bg-gradient-to-r from-sky-500 to-blue-500 text-white rounded-2xl font-black text-sm hover:from-sky-600 hover:to-blue-600 shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95"
                                 >
-                                    {isUploading ? <LoadingSpinner size="sm" /> : <span>تحميل الموضوع 📥</span>}
+                                    {isUploading ? <LoadingSpinner size="sm" /> : <span>Télécharger le sujet 📥</span>}
                                 </button>
                             </div>
                         ) : (
-                            <p className="text-center py-6 text-slate-400 text-xs italic">لا يوجد موضوع حالياً</p>
+                            <p className="text-center py-6 text-gray-400 text-xs italic">Aucun sujet disponible</p>
                         )}
                     </Card>
 
-                    <Card className="p-6 border-none bg-white shadow-xl shadow-slate-100 rounded-[2rem] border border-slate-100">
-                        <h3 className="text-sm font-black text-slate-800 mb-6 flex items-center justify-between">
+                    <Card className="p-6 border-none bg-white shadow-xl rounded-[2rem] border border-sky-100">
+                        <h3 className="text-sm font-black bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent mb-6 flex items-center justify-between">
                             <span className="flex items-center gap-3">
                                 <span className="p-2 bg-amber-50 rounded-xl text-lg">📎</span>
-                                المرفقات
+                                Pièces jointes
                             </span>
-                            <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[10px] font-black">
+                            <span className="bg-sky-100 text-sky-600 px-3 py-1 rounded-full text-[10px] font-black">
                                 {resources.filter(r => r.kind === 'attachment').length}
                             </span>
                         </h3>
                         <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pl-2">
                             {resources.filter(r => r.kind === 'attachment').map((res, i) => (
-                                <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:bg-white transition-all group">
-                                    <p className="text-[11px] font-bold text-slate-700 truncate flex-1">{res.file_name}</p>
+                                <div key={i} className="flex items-center justify-between p-3 bg-sky-50 rounded-2xl border border-sky-100 hover:border-sky-300 hover:bg-white transition-all group">
+                                    <p className="text-[11px] font-bold text-gray-700 truncate flex-1">{res.file_name}</p>
                                     <a
                                         href={`${baseUrl}${res.url}`}
                                         download
-                                        className="ml-2 p-2 text-indigo-600 bg-white rounded-xl shadow-sm border border-slate-100 hover:scale-110 transition-transform"
+                                        className="ml-2 p-2 text-sky-600 bg-white rounded-xl shadow-sm border border-sky-100 hover:scale-110 transition-transform"
                                     >
                                         📥
                                     </a>
                                 </div>
                             ))}
                             {resources.filter(r => r.kind === 'attachment').length === 0 && (
-                                <div className="text-center py-8 text-slate-400">
-                                    <p className="text-xs italic">لا توجد مرفقات إضافية</p>
+                                <div className="text-center py-8 text-gray-400">
+                                    <p className="text-xs italic">Aucune pièce jointe</p>
                                 </div>
                             )}
                         </div>
@@ -383,57 +383,57 @@ export default function ExamRoom() {
                     <Card className={`p-10 bg-white border-none shadow-[0_32px_64px_-16px_rgba(0,0,0,0.05)] rounded-[3rem] text-center relative overflow-hidden transition-all duration-500 ${isFinalized ? 'opacity-70 grayscale' : ''}`}>
                         {isFinalized && (
                             <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center">
-                                <div className="bg-emerald-500 text-white px-8 py-3 rounded-2xl shadow-2xl font-black rotate-[-5deg] border-4 border-white">✨ تم استلام إجاباتك بنجاح ✨</div>
+                                <div className="bg-emerald-500 text-white px-8 py-3 rounded-2xl shadow-2xl font-black rotate-[-5deg] border-4 border-white">✨ Vos réponses ont été reçues ✨</div>
                             </div>
                         )}
 
-                        <div className={`mb-8 h-24 w-24 mx-auto flex items-center justify-center rounded-[2.5rem] shadow-2xl transition-all duration-700 ${isFinalized ? 'bg-slate-200 text-slate-400' : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white scale-110 shadow-indigo-200'}`}>
+                        <div className={`mb-8 h-24 w-24 mx-auto flex items-center justify-center rounded-[2.5rem] shadow-2xl transition-all duration-700 ${isFinalized ? 'bg-gray-200 text-gray-400' : 'bg-gradient-to-br from-sky-500 to-blue-600 text-white scale-110 shadow-sky-200'}`}>
                             <span className="text-4xl">{isFinalized ? '🔒' : '🚀'}</span>
                         </div>
 
-                        <h2 className="text-3xl font-black text-slate-900 mb-3 tracking-tight">تسليم العمل النهائي</h2>
-                        <p className="text-slate-500 mb-10 text-sm font-medium">قم برفع ملفاتك هنا. يمكنك التعديل والحذف ما لم تضغط على زر الإنهاء.</p>
+                        <h2 className="text-3xl font-black bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent mb-3 tracking-tight">Soumission finale</h2>
+                        <p className="text-gray-600 mb-10 text-sm font-medium">Téléversez vos fichiers ici. Vous pouvez modifier et supprimer tant que vous n'avez pas cliqué sur "Terminer".</p>
 
                         <form onSubmit={handleUpload} className="w-full space-y-8">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <label className="flex flex-col items-center justify-center w-full h-48 border-4 border-dashed border-slate-100 rounded-[2.5rem] cursor-pointer bg-slate-50/50 hover:bg-white hover:border-indigo-400 hover:shadow-2xl hover:shadow-indigo-50 transition-all group overflow-hidden">
-                                    <div className="flex flex-col items-center justify-center text-slate-300 group-hover:text-indigo-500 transition-colors">
+                                <label className="flex flex-col items-center justify-center w-full h-48 border-4 border-dashed border-sky-100 rounded-[2.5rem] cursor-pointer bg-sky-50/30 hover:bg-white hover:border-sky-400 hover:shadow-2xl hover:shadow-sky-50 transition-all group overflow-hidden">
+                                    <div className="flex flex-col items-center justify-center text-sky-300 group-hover:text-sky-500 transition-colors">
                                         <span className="text-5xl mb-3 group-hover:scale-110 transition-transform">📄</span>
-                                        <p className="text-xs font-black uppercase tracking-widest">اختيار ملفات</p>
+                                        <p className="text-xs font-black uppercase tracking-widest">Sélectionner fichiers</p>
                                     </div>
                                     <input type="file" className="hidden" multiple onChange={(e) => setSelectedFiles(e.target.files)} />
                                 </label>
 
-                                <label className="flex flex-col items-center justify-center w-full h-48 border-4 border-dashed border-slate-100 rounded-[2.5rem] cursor-pointer bg-slate-50/50 hover:bg-white hover:border-purple-400 hover:shadow-2xl hover:shadow-purple-50 transition-all group overflow-hidden">
-                                    <div className="flex flex-col items-center justify-center text-slate-300 group-hover:text-purple-500 transition-colors">
+                                <label className="flex flex-col items-center justify-center w-full h-48 border-4 border-dashed border-purple-100 rounded-[2.5rem] cursor-pointer bg-purple-50/30 hover:bg-white hover:border-purple-400 hover:shadow-2xl hover:shadow-purple-50 transition-all group overflow-hidden">
+                                    <div className="flex flex-col items-center justify-center text-purple-300 group-hover:text-purple-500 transition-colors">
                                         <span className="text-5xl mb-3 group-hover:scale-110 transition-transform">📁</span>
-                                        <p className="text-xs font-black uppercase tracking-widest">اختيار مجلد</p>
+                                        <p className="text-xs font-black uppercase tracking-widest">Sélectionner dossier</p>
                                     </div>
                                     <input type="file" className="hidden" {...({ webkitdirectory: "", directory: "" } as any)} onChange={(e) => setSelectedFiles(e.target.files)} />
                                 </label>
                             </div>
 
                             {selectedFiles && (
-                                <div className="bg-indigo-50/50 border-2 border-indigo-100 p-4 rounded-2xl">
-                                    <p className="text-indigo-600 font-black text-xs">📎 تم تحديد {selectedFiles.length} ملف جاهز للرفع</p>
+                                <div className="bg-sky-50/50 border-2 border-sky-100 p-4 rounded-2xl">
+                                    <p className="text-sky-600 font-black text-xs">📎 {selectedFiles.length} fichier(s) sélectionné(s)</p>
                                 </div>
                             )}
 
                             <Button
                                 type="submit"
                                 disabled={isEnded || isFinalized || isUploading}
-                                className={`w-full py-6 text-xl font-black rounded-3xl shadow-2xl transition-all duration-300 ${isFinalized ? 'bg-slate-200' : isEnded ? 'bg-slate-400' : 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:scale-[1.02] active:scale-95 shadow-indigo-200'}`}
+                                className={`w-full py-6 text-xl font-black rounded-3xl shadow-2xl transition-all duration-300 ${isFinalized ? 'bg-gray-200' : isEnded ? 'bg-gray-400' : 'bg-gradient-to-r from-sky-600 via-sky-500 to-blue-600 hover:scale-[1.02] active:scale-95 shadow-sky-200'}`}
                             >
-                                {isUploading ? <LoadingSpinner color="white" /> : isFinalized ? "تم الاستلام نهائياً ✅" : isEnded ? "خارج وقت التسليم" : "تأكيد رفع الملفات 📥"}
+                                {isUploading ? <LoadingSpinner color="white" /> : isFinalized ? "Réception confirmée ✅" : isEnded ? "Hors délai" : "Confirmer l'envoi 📥"}
                             </Button>
                         </form>
 
                         {!isFinalized && submittedFiles.length > 0 && (
                             <button
                                 onClick={() => setShowFinalizeConfirm(true)}
-                                className="mt-8 w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-sm hover:bg-black transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3 group"
+                                className="mt-8 w-full py-4 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-[1.5rem] font-black text-sm hover:from-sky-700 hover:to-blue-700 transition-all shadow-xl shadow-sky-200 flex items-center justify-center gap-3 group"
                             >
-                                🏁 إنهاء الامتحان وإرسال النتيجة النهائية
+                                🏁 Terminer l'examen et envoyer la copie finale
                                 <span className="group-hover:translate-x-2 transition-transform">➡️</span>
                             </button>
                         )}
@@ -442,16 +442,16 @@ export default function ExamRoom() {
                     <div className="bg-amber-50 rounded-[2.5rem] p-6 border-b-4 border-amber-200 flex items-start gap-4">
                         <span className="text-3xl">💡</span>
                         <p className="text-xs text-amber-800 font-bold leading-relaxed">
-                            بعد رفع ملفاتك، تأكد من مراجعتها في القائمة الجانبية. لا تضغط على زر **"إنهاء الامتحان"** إلا عندما تكون واثقاً تماماً من عملك، حيث سيتم إرسال العمل نهائياً للأستاذ.
+                            Après avoir téléversé vos fichiers, vérifiez-les dans la liste latérale. Ne cliquez sur **"Terminer l'examen"** que lorsque vous êtes absolument certain de votre travail, car cela enverra votre copie définitive au professeur.
                         </p>
                     </div>
                 </div>
 
                 {/* Column 3: History & Alerts (Left/Side) */}
                 <div className="col-span-12 lg:col-span-3 space-y-6">
-                    <Card className="p-6 border-none bg-slate-900 shadow-2xl shadow-slate-200 rounded-[2rem] text-white">
-                        <h3 className="text-sm font-black text-slate-400 mb-6 flex justify-between items-center uppercase tracking-[0.2em]">
-                            الملفات المرفوعة 📁
+                    <Card className="p-6 border-none bg-gradient-to-br from-sky-600 to-blue-600 shadow-2xl rounded-[2rem] text-white">
+                        <h3 className="text-sm font-black text-sky-200 mb-6 flex justify-between items-center uppercase tracking-[0.2em]">
+                            Fichiers envoyés 📁
                             <span className="bg-white/10 text-white px-2 py-0.5 rounded-lg text-[10px]">{submittedFiles.length}</span>
                         </h3>
                         <div className="space-y-4 max-h-[400px] overflow-y-auto pl-2 custom-scrollbar-dark">
@@ -463,7 +463,7 @@ export default function ExamRoom() {
                                             <span className="text-[11px] font-black truncate max-w-[120px]">{f.name}</span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between text-[9px] font-bold text-slate-400">
+                                    <div className="flex items-center justify-between text-[9px] font-bold text-sky-200">
                                         <div className="flex gap-4">
                                             <span>⏲️ {f.time}</span>
                                             <span>📦 {f.size || 'N/A'}</span>
@@ -473,34 +473,34 @@ export default function ExamRoom() {
                                                 onClick={() => cancelSubmission(f.id, i)}
                                                 className="text-red-400 hover:text-white transition-colors"
                                             >
-                                                إلغاء 🗑️
+                                                Annuler 🗑️
                                             </button>
                                         )}
                                     </div>
                                 </div>
                             ))}
                             {submittedFiles.length === 0 && (
-                                <div className="text-center py-12 text-slate-600">
+                                <div className="text-center py-12 text-sky-300">
                                     <span className="text-4xl block mb-2 opacity-20">📭</span>
-                                    <p className="text-xs font-bold italic">لا توجد ملفات حالياً</p>
+                                    <p className="text-xs font-bold italic">Aucun fichier pour le moment</p>
                                 </div>
                             )}
                         </div>
                     </Card>
 
-                    <Card className="p-6 border-none bg-white shadow-xl shadow-slate-100 rounded-[2rem] border border-slate-100">
-                        <h3 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-3">
+                    <Card className="p-6 border-none bg-white shadow-xl rounded-[2rem] border border-sky-100">
+                        <h3 className="text-sm font-black bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent mb-4 flex items-center gap-3">
                             <span className="p-2 bg-red-50 rounded-xl text-lg">⚠️</span>
-                            تنبيهات هامة
+                            Alertes importantes
                         </h3>
                         <ul className="space-y-3">
                             {[
-                                "تأكد من استقرار شبكة الإنترنت.",
-                                "يمنع محاولة تغيير المتصفح أو الشبكة.",
-                                "التسجيل النهائي يرسل بضغطة واحدة."
+                                "Assurez-vous d'avoir une connexion Internet stable.",
+                                "Ne changez pas de navigateur ou de réseau.",
+                                "La soumission finale s'envoie en un seul clic."
                             ].map((note, idx) => (
-                                <li key={idx} className="text-[10px] font-bold text-slate-600 flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1 flex-shrink-0"></span>
+                                <li key={idx} className="text-[10px] font-bold text-gray-600 flex items-start gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 mt-1 flex-shrink-0"></span>
                                     {note}
                                 </li>
                             ))}

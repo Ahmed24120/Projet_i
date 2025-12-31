@@ -78,4 +78,53 @@ router.post("/login", async (req, res) => {
   });
 });
 
+// Inscription
+router.post("/register", async (req, res) => {
+  const { prenom, nom, email, password, role, matricule, secretCode } = req.body;
+
+  if (!prenom || !nom || !email || !password || !role) {
+    return res.status(400).json({ message: "Champs obligatoires manquants" });
+  }
+
+  // Vérification Code Secret pour Professeur
+  if (role === 'professor' && secretCode !== 'PSN147') {
+    return res.status(403).json({ message: "Code secret invalide pour l'inscription professeur" });
+  }
+
+  // Vérification existence
+  const checkQuery = "SELECT id FROM users WHERE email = ? OR (matricule = ? AND matricule IS NOT NULL)";
+  db.get(checkQuery, [email, matricule || null], async (err, existing) => {
+    if (err) return res.status(500).json({ message: "Erreur base de données" });
+    if (existing) return res.status(409).json({ message: "Email ou Matricule déjà utilisé" });
+
+    // Hashage
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const fullName = `${prenom} ${nom}`;
+
+    const insertQuery = `
+      INSERT INTO users (name, email, password_hash, role, matricule)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+
+    db.run(insertQuery, [fullName, email, hashedPassword, role, matricule || null], function (err) {
+      if (err) {
+        console.error("Register Error:", err);
+        return res.status(500).json({ message: "Erreur lors de la création du compte: " + err.message });
+      }
+
+      const userId = this.lastID;
+      const token = jwt.sign(
+        { id: userId, role, matricule: matricule || email, name: fullName },
+        process.env.JWT_SECRET || "secret",
+        { expiresIn: "4h" }
+      );
+
+      res.status(201).json({
+        token,
+        user: { id: userId, role, email, matricule, name: fullName }
+      });
+    });
+  });
+});
+
 module.exports = router;

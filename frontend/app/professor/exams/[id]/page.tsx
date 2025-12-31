@@ -8,7 +8,6 @@ import { apiFetch, baseUrl } from "@/lib/api";
 import { toast } from "@/components/ui/Toast";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type SubmittedFile = {
@@ -27,6 +26,7 @@ type StudentState = {
     warnings: string[];
     submittedFiles: SubmittedFile[];
     isFinalized?: boolean;
+    roomNumber?: string;
 };
 
 export default function ProfessorMonitor() {
@@ -42,9 +42,13 @@ export default function ProfessorMonitor() {
     const [showClearLogsConfirm, setShowClearLogsConfirm] = useState(false);
     const [selectedStudentForFiles, setSelectedStudentForFiles] = useState<StudentState | null>(null);
     const [previewFile, setPreviewFile] = useState<SubmittedFile | null>(null);
+    const [userRoom, setUserRoom] = useState("");
 
     useEffect(() => {
         const token = localStorage.getItem("token");
+        const room = localStorage.getItem("roomNumber") || "";
+        setUserRoom(room);
+
         if (token) {
             apiFetch(`/exams/${id}`, {}, token).then((d: any) => setExamTitle(d.titre)).catch(() => { });
         }
@@ -65,8 +69,10 @@ export default function ProfessorMonitor() {
         }
 
         loadLogs();
-        socket.emit("professor-join");
-        socket.emit("join-exam", { examId: id, role: "professor" });
+
+        // Join updates for this room
+        socket.emit("professor-join", { roomNumber: room });
+        socket.emit("join-exam", { examId: id, role: "professor", roomNumber: room });
 
         socket.on("update-student-list", (list: any[]) => {
             const examStudents = list.filter(s => String(s.examId) === String(id));
@@ -82,7 +88,8 @@ export default function ProfessorMonitor() {
                         status: s.status as any,
                         lastSeen: s.lastSeen,
                         warnings: s.history?.filter((h: any) => h.type === 'FRAUDE').map((h: any) => h.message) || [],
-                        submittedFiles: existing ? existing.submittedFiles : []
+                        submittedFiles: existing ? existing.submittedFiles : [],
+                        roomNumber: s.roomNumber
                     };
                 });
                 return newMap;
@@ -98,7 +105,7 @@ export default function ProfessorMonitor() {
 
         socket.on("student-connected", (p) => {
             if (p.role === "professor") return;
-            updateStudent(p.studentId, { status: "online", matricule: p.matricule, lastSeen: p.at });
+            updateStudent(p.studentId, { status: "online", matricule: p.matricule, lastSeen: p.at, roomNumber: p.roomNumber });
             addLog(`دخول الطالب: ${p.matricule || p.studentId}`, 'success');
         });
 
@@ -170,22 +177,11 @@ export default function ProfessorMonitor() {
         });
 
         socket.on("file-submitted", (p) => {
-            // p contains: { workId, examId, studentId, files: [{ name, filename, path }], at }
-            // API upload returns 'filename' (disk name) and 'name' (original).
-            // We need to construct URL. URL pattern: /static/exams/{examId}/students/{matricule}/{filename}
-
-            // We need the student's matricule to build the URL or find the student to update.
-            // p.studentId is the DB ID (or socket ID? backend says studentId: id_etud which is DB ID usually).
-            // Wait, previous code treated p.studentId as the key in 'students' map.
-            // 'students' map keys come from 'studentsPresence' in backend which keys by socket.id usually?
-            // backend/sockets/index.js: studentsPresence.set(socket.id, { ... studentId: user.id ... })
-            // So students map is keyed by studentId (DB ID).
-
             const sid = String(p.studentId);
 
             setStudents(prev => {
                 const s = prev[sid];
-                if (!s) return prev; // Student not found in list (weird)
+                if (!s) return prev;
 
                 const newFiles: SubmittedFile[] = (p.files || []).map((f: any) => ({
                     name: f.name,
@@ -193,7 +189,6 @@ export default function ProfessorMonitor() {
                     exists: true
                 }));
 
-                // Avoid duplicates by checking URL or name
                 const combined = [...s.submittedFiles];
                 newFiles.forEach(nf => {
                     if (!combined.find(cf => cf.url === nf.url)) {
@@ -245,8 +240,6 @@ export default function ProfessorMonitor() {
         };
     }, [id, socket]);
 
-    // ... (helper functions) ...
-
     function translateCheat(type: string, details: string) {
         if (type === "TAB_SWITCH") return "تبديل نافذة";
         if (type === "FOCUS_LOST") return "فقدان تركيز";
@@ -257,9 +250,7 @@ export default function ProfessorMonitor() {
 
     function updateStudent(studentId: string, changes: Partial<StudentState> | ((prev: StudentState) => Partial<StudentState>)) {
         setStudents((prev) => {
-            // Ensure submittedFiles is initialized as empty array if missing
             const current = prev[studentId] || { studentId, status: "offline", warnings: [], submittedFiles: [] };
-            // @ts-ignore - Partial<StudentState> complexity with new type
             const newVals = typeof changes === 'function' ? changes(current) : changes;
             return { ...prev, [studentId]: { ...current, ...newVals } };
         });
@@ -269,64 +260,62 @@ export default function ProfessorMonitor() {
         setLogs((prev) => [{ msg, type, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
     }
 
-    // ... (render) ...
-
     const onlineCount = Object.values(students).filter(s => s.status === 'online').length;
 
     return (
-        <div dir="rtl" className="min-h-screen bg-slate-50 flex flex-col font-sans">
+        <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-50 flex flex-col font-sans">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+            <header className="bg-white/90 backdrop-blur-sm border-b border-sky-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-lg">
                 <div className="flex items-center gap-4">
                     <Link
                         href="/professor/dashboard"
-                        className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                        title="رجوع"
+                        className="p-2 rounded-xl bg-sky-100 text-sky-600 hover:bg-sky-200 transition-all shadow-sm"
+                        title="Retour"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </Link>
-                    <div className="bg-indigo-600 text-white p-2 rounded-xl">
+                    <div className="bg-gradient-to-br from-sky-500 to-blue-500 text-white p-2 rounded-xl shadow-md">
                         <span className="text-2xl font-bold">🎓</span>
                     </div>
                     <div>
-                        <h1 className="text-xl font-black text-slate-800">{examTitle || 'مراقبة الامتحان'}</h1>
-                        <p className="text-xs text-slate-500 font-medium">لوحة التحكم المباشرة</p>
+                        <h1 className="text-xl font-black bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent">{examTitle || 'Surveillance Examen'}</h1>
+                        <p className="text-xs text-gray-600 font-medium">Tableau de bord en temps réel {userRoom && `- Salle ${userRoom}`}</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-6">
-                    <div className={`px-4 py-2 rounded-xl font-mono text-xl font-bold tracking-widest ${isEnded ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-700'}`}>
+                    <div className={`px-4 py-2 rounded-xl font-mono text-xl font-bold tracking-widest shadow-md ${isEnded ? 'bg-red-100 text-red-600' : 'bg-sky-100 text-sky-700'}`}>
                         {timerStr}
                     </div>
-                    <Badge variant={isEnded ? 'danger' : 'success'}>{isEnded ? 'منتهي' : 'جاري'}</Badge>
+                    <Badge variant={isEnded ? 'danger' : 'success'}>{isEnded ? 'Terminé' : 'En cours'}</Badge>
                 </div>
             </header>
 
             <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Visual Grid of Students */}
                 <div className="lg:col-span-3 space-y-6">
-                    <Card>
-                        <div className="mb-4 pb-2 border-b border-gray-100 flex justify-between items-center">
-                            <h3 className="font-bold text-lg text-slate-800">الممتحنين ({onlineCount}/{Object.keys(students).length})</h3>
+                    <Card className="bg-white/90 backdrop-blur-sm border-sky-100 shadow-xl">
+                        <div className="mb-4 pb-2 border-b border-sky-100 flex justify-between items-center">
+                            <h3 className="font-bold text-lg bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent">📊 Étudiants ({onlineCount}/{Object.keys(students).length})</h3>
                         </div>
                         {Object.keys(students).length === 0 ? (
                             <div className="text-center py-20 opacity-50">
                                 <span className="text-6xl mb-4 block">👥</span>
-                                <p>بانتظار التحاق الطلبة...</p>
+                                <p className="text-gray-600">En attente de connexion des étudiants...</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                                 {Object.values(students)
                                     .sort((a, b) => (a.status === 'online' ? -1 : 1))
                                     .map(s => (
-                                        <div key={s.studentId} className={`relative p-4 rounded-2xl border-2 transition-all group ${s.status === 'online' ? 'bg-white border-indigo-100 shadow-sm hover:border-indigo-300' : s.status === 'no-wifi' ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100 opacity-70'}`}>
+                                        <div key={s.studentId} className={`relative p-4 rounded-2xl border-2 transition-all group shadow-md hover:shadow-lg ${s.status === 'online' ? 'bg-white border-sky-200 hover:border-sky-400' : s.status === 'no-wifi' ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}>
                                             <div className="flex justify-between items-start mb-3">
                                                 <Badge variant={s.status === 'online' ? 'success' : s.status === 'no-wifi' ? 'warning' : 'default'}>
-                                                    {s.status === 'online' ? 'متصل' : s.status === 'no-wifi' ? 'لا يوجد إنترنت' : (s.submittedFiles && s.submittedFiles.length > 0) ? 'غير متصل' : 'غائب'}
+                                                    {s.status === 'online' ? '🟢 Connecté' : s.status === 'no-wifi' ? '📡 Hors ligne' : (s.submittedFiles && s.submittedFiles.length > 0) ? '⚪ Déconnecté' : '❌ Absent'}
                                                 </Badge>
-                                                <div className="text-left">
-                                                    <span className="block text-lg font-black text-slate-800 leading-tight">{s.matricule || '...'}</span>
-                                                    <span className="text-[10px] text-slate-400 font-mono">#{s.studentId}</span>
+                                                <div className="text-right">
+                                                    <span className="block text-lg font-black text-gray-800 leading-tight">{s.matricule || '...'}</span>
+                                                    <span className="text-[10px] text-gray-400 font-mono">#{s.studentId}</span>
                                                 </div>
                                             </div>
 
@@ -341,28 +330,35 @@ export default function ProfessorMonitor() {
                                                 </div>
                                             )}
 
+                                            {/* Room Badge */}
+                                            {s.roomNumber && (
+                                                <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-gray-100 text-[9px] rounded text-gray-400 border border-gray-200">
+                                                    {s.roomNumber}
+                                                </div>
+                                            )}
+
                                             {/* Submission Status */}
-                                            <div className={`mt-3 pt-3 border-t ${s.status === 'online' ? 'border-indigo-50' : 'border-slate-100'}`}>
+                                            <div className={`mt-3 pt-3 border-t ${s.status === 'online' ? 'border-sky-100' : 'border-gray-100'}`}>
                                                 {s.submittedFiles && s.submittedFiles.length > 0 ? (
-                                                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg mb-2">
+                                                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg mb-2 shadow-sm">
                                                         <span>📎</span>
-                                                        <span className="text-xs font-bold">{s.submittedFiles.length} ملفات</span>
+                                                        <span className="text-xs font-bold">{s.submittedFiles.length} fichier(s)</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex items-center gap-2 text-slate-400 bg-slate-100 px-3 py-2 rounded-lg mb-2">
+                                                    <div className="flex items-center gap-2 text-gray-400 bg-gray-100 px-3 py-2 rounded-lg mb-2">
                                                         <span>⏳</span>
-                                                        <span className="text-xs">لم يسلم بعد</span>
+                                                        <span className="text-xs">Pas encore soumis</span>
                                                     </div>
                                                 )}
 
                                                 <button
                                                     onClick={() => s.isFinalized ? setSelectedStudentForFiles(s) : null}
                                                     disabled={!s.isFinalized}
-                                                    className={`w-full py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 ${s.isFinalized
-                                                        ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                                                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                                    className={`w-full py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm ${s.isFinalized
+                                                        ? 'bg-sky-50 text-sky-600 hover:bg-sky-100 hover:shadow-md'
+                                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                                                 >
-                                                    {s.isFinalized ? '📂 عرض الملفات' : '⏳ الطالب لم ينهِ الامتحان'}
+                                                    {s.isFinalized ? '📂 Voir les fichiers' : '⏳ Examen non terminé'}
                                                 </button>
                                             </div>
                                         </div>
@@ -374,24 +370,24 @@ export default function ProfessorMonitor() {
 
                 {/* Logs Sidebar */}
                 <div className="lg:col-span-1 h-[calc(100vh-8rem)] sticky top-24">
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-                        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                            <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                                <span>📜</span> السجل
+                    <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-sky-100 overflow-hidden flex flex-col h-full">
+                        <div className="p-4 border-b border-sky-100 bg-gradient-to-r from-sky-50 to-blue-50 flex justify-between items-center">
+                            <h3 className="font-bold bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-2">
+                                <span>📜</span> Journal
                             </h3>
-                            <button onClick={() => setShowClearLogsConfirm(true)} className="text-[10px] text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors">
-                                مسح
+                            <button onClick={() => setShowClearLogsConfirm(true)} className="text-[10px] text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-all shadow-sm">
+                                Effacer
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-3">
                             {logs.length === 0 ? (
                                 <div className="text-center py-12 opacity-30">
                                     <span className="text-4xl px-2">📭</span>
-                                    <p className="text-xs mt-2">لا يوجد نشاط</p>
+                                    <p className="text-xs mt-2 text-gray-500">Aucune activité</p>
                                 </div>
                             ) : (
                                 logs.map((l, i) => (
-                                    <div key={i} className={`text-xs p-3 rounded-xl border relative overflow-hidden ${l.type === 'warn' ? 'bg-amber-50 border-amber-100 text-amber-800' : l.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-white border-slate-100 text-slate-600'}`}>
+                                    <div key={i} className={`text-xs p-3 rounded-xl border relative overflow-hidden shadow-sm ${l.type === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-800' : l.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-sky-100 text-gray-600'}`}>
                                         <div className="flex justify-between opacity-50 mb-1 font-mono text-[9px]">
                                             <span>{l.time}</span>
                                         </div>
@@ -409,6 +405,7 @@ export default function ProfessorMonitor() {
                 isOpen={!!selectedStudentForFiles}
                 onClose={() => setSelectedStudentForFiles(null)}
                 studentData={selectedStudentForFiles}
+                onPreview={(file) => setPreviewFile(file)}
             />
 
             <FilePreviewModal
@@ -418,10 +415,10 @@ export default function ProfessorMonitor() {
 
             <ConfirmModal
                 isOpen={showClearLogsConfirm}
-                title="مسح السجل"
-                message="هل أنت متأكد من مسح جميع السجلات؟"
-                confirmText="نعم، مسح"
-                cancelText="إلغاء"
+                title="Effacer le journal"
+                message="Êtes-vous sûr de vouloir effacer tous les journaux ?"
+                confirmText="Oui, effacer"
+                cancelText="Annuler"
                 type="danger"
                 onConfirm={() => {
                     setLogs([]);
@@ -433,10 +430,7 @@ export default function ProfessorMonitor() {
     );
 }
 
-// Update StudentState interface (usually implied, but good to be explicit in mind or if defined elsewhere)
-// But here I'll just update the component usage.
-
-function FileViewerModal({ isOpen, onClose, studentData }: { isOpen: boolean, onClose: () => void, studentData: StudentState | null }) {
+function FileViewerModal({ isOpen, onClose, studentData, onPreview }: { isOpen: boolean, onClose: () => void, studentData: StudentState | null, onPreview: (file: SubmittedFile) => void }) {
     if (!isOpen || !studentData) return null;
     const { submittedFiles, studentId, matricule } = studentData;
 
@@ -481,7 +475,7 @@ function FileViewerModal({ isOpen, onClose, studentData }: { isOpen: boolean, on
                                 <div className="flex gap-2">
                                     <>
                                         <button
-                                            onClick={() => setPreviewFile(file)}
+                                            onClick={() => onPreview(file)}
                                             className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-200 transition-colors"
                                         >
                                             عرض
@@ -510,3 +504,42 @@ function FileViewerModal({ isOpen, onClose, studentData }: { isOpen: boolean, on
     );
 }
 
+function FilePreviewModal({ file, onClose }: { file: SubmittedFile | null, onClose: () => void }) {
+    if (!file) return null;
+
+    const isImage = file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const isPdf = file.name.match(/\.pdf$/i);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={onClose}>
+            <div className="relative w-full max-w-4xl h-[85vh] bg-transparent flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+                <button
+                    onClick={onClose}
+                    className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+                >
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+
+                {isImage ? (
+                    <img src={`${baseUrl}${file.url}`} alt={file.name} className="max-w-full max-h-full rounded-lg shadow-2xl object-contain bg-white" />
+                ) : isPdf ? (
+                    <iframe src={`${baseUrl}${file.url}`} className="w-full h-full rounded-lg shadow-2xl bg-white" title={file.name}></iframe>
+                ) : (
+                    <div className="bg-white p-8 rounded-2xl text-center shadow-2xl">
+                        <div className="text-6xl mb-4">📄</div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">{file.name}</h3>
+                        <p className="text-slate-500 mb-6">لا يمكن معاينة هذا الملف مباشرة</p>
+                        <a
+                            href={`${baseUrl}${file.url}`}
+                            download
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            تحميل الملف
+                        </a>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

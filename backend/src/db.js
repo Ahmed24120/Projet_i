@@ -58,9 +58,15 @@ db.serialize(() => {
       description TEXT,
       date_debut TEXT,
       date_fin TEXT,
-      sujet_path TEXT
+      sujet_path TEXT,
+      professor_id INTEGER
     )
   `);
+
+  // Migration: Ajouter room_number à examen
+  db.run("ALTER TABLE examen ADD COLUMN room_number TEXT", (err) => {
+    if (!err) console.log("✅ Migration: Colonne room_number ajoutée à examen");
+  });
 
   db.run(`
     CREATE TABLE IF NOT EXISTS works (

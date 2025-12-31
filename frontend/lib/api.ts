@@ -14,11 +14,17 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   token?: string
 ): Promise<T> {
+  // Auto-detect token from localStorage if in browser and not provided
+  let authToken = token;
+  if (!authToken && typeof window !== "undefined") {
+    authToken = localStorage.getItem("token") || undefined;
+  }
+
   const res = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...(options.headers || {}),
     },
   });
@@ -42,7 +48,7 @@ export async function loginProfessor(
   email: string,
   password: string
 ) {
-  return apiFetch<{ token: string }>(`/auth/login`, {
+  return apiFetch<{ token: string; user: any }>(`/auth/login`, {
     method: "POST",
     body: JSON.stringify({
       email,
@@ -66,5 +72,14 @@ export async function loginStudent(
       password,
       role: "student",
     }),
+  });
+}
+/**
+ * User Registration
+ */
+export async function registerUser(data: any) {
+  return apiFetch<{ token: string; user: any }>(`/auth/register`, {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }

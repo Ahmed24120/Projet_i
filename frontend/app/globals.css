@@ -1,190 +1,195 @@
 @import "tailwindcss";
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-  --primary: #3b82f6;
-  --secondary: #8b5cf6;
+  /* Palette Principale: Slate (Gris bleuté) & Blue (Accent) */
+  --background: #f8fafc;
+  /* Slate 50 */
+  --foreground: #0f172a;
+  /* Slate 900 */
 
-  /* Animations */
-  --animate-float: float 4s ease-in-out infinite;
-  --animate-shimmer: shimmer 2s infinite;
-  --animate-pulse-glow: pulse-glow 2s infinite;
-  --animate-fade-in: fade-in-up 0.6s ease-out forwards;
-  --animate-slide-up: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+  --primary: #2563eb;
+  /* Blue 600 */
+  --primary-foreground: #ffffff;
 
-@theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
+  --secondary: #e2e8f0;
+  /* Slate 200 */
+  --secondary-foreground: #1e293b;
+  /* Slate 800 */
 
-  --color-secondary-500: #8b5cf6;
+  --muted: #f1f5f9;
+  /* Slate 100 */
+  --muted-foreground: #64748b;
+  /* Slate 500 */
 
-  --animate-fade-in: fade-in-up 0.6s ease-out forwards;
+  --accent: #dbeafe;
+  /* Blue 100 */
+  --accent-foreground: #1e40af;
+  /* Blue 800 */
+
+  --destructive: #ef4444;
+  /* Red 500 */
+  --destructive-foreground: #ffffff;
+
+  --border: #e2e8f0;
+  /* Slate 200 */
+  --input: #e2e8f0;
+  --ring: #2563eb;
+
+  --radius: 0.75rem;
+
+  /* Custom Gradients */
+  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  --gradient-surface: linear-gradient(to bottom right, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    --background: #020617;
+    /* Slate 950 */
+    --foreground: #f8fafc;
+    /* Slate 50 */
+
+    --primary: #3b82f6;
+    /* Blue 500 */
+    --primary-foreground: #ffffff;
+
+    --secondary: #1e293b;
+    /* Slate 800 */
+    --secondary-foreground: #f8fafc;
+
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    /* Slate 400 */
+
+    --accent: #1e293b;
+    --accent-foreground: #f8fafc;
+
+    --destructive: #7f1d1d;
+    /* Red 900 */
+    --destructive-foreground: #f8fafc;
+
+    --border: #1e293b;
+    --input: #1e293b;
+    --ring: #3b82f6;
+
+    --gradient-surface: linear-gradient(to bottom right, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.4));
   }
+}
+
+@theme {
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.5s ease-out forwards;
+  --animate-slide-up: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))) rgb(var(--background-start-rgb));
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Glassmorphism Utilities */
+.glass {
+  background: var(--gradient-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--foreground), 0.1);
 }
 
-/* Keyframes */
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-
-  50% {
-    transform: translateY(-8px);
-  }
+.glass-panel {
+  background: rgba(255, 255, 255, 0.05);
+  /* Ultra subtle */
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-
-  100% {
-    background-position: 1000px 0;
-  }
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-@keyframes pulse-glow {
-
-  0%,
-  100% {
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
-  }
-
-  50% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
-  }
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-@keyframes fade-in-up {
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Animations Keyframes */
+@keyframes accordion-down {
   from {
-    opacity: 0;
-    transform: translateY(20px);
+    height: 0
   }
 
   to {
-    opacity: 1;
-    transform: translateY(0);
+    height: var(--radix-accordion-content-height)
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height)
+  }
+
+  to {
+    height: 0
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0
+  }
+
+  to {
+    opacity: 1
   }
 }
 
 @keyframes slide-up {
   from {
+    transform: translateY(20px);
     opacity: 0;
-    transform: translateY(40px) scale(0.95);
   }
 
   to {
+    transform: translateY(0);
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
-}
-
-/* Utility classes for animations if not using Tailwind config extension */
-.animate-float {
-  animation: var(--animate-float);
-}
-
-.animate-shimmer {
-  animation: var(--animate-shimmer);
-}
-
-.animate-pulse-glow {
-  animation: var(--animate-pulse-glow);
-}
-
-.animate-fade-in {
-  animation: var(--animate-fade-in);
-}
-
-.animate-slide-up {
-  animation: var(--animate-slide-up);
-}
-
-/* Couleurs lisibles demandées */
-.text-readable {
-  color: #1f2937 !important;
-}
-
-.bg-notification {
-  background-color: #fef3c7 !important;
-  color: #92400e !important;
-}
-
-.bg-cheat-alert {
-  background-color: #fee2e2 !important;
-  color: #991b1b !important;
-}
-
-.bg-submission-success {
-  background-color: #d1fae5 !important;
-  color: #065f46 !important;
-}
-
-/* Amélioration des cartes étudiants */
-.student-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  transition: all 0.3s ease;
-  color: #1f2937;
-}
-
-.student-card.connected {
-  border-left: 4px solid #10b981;
-}
-
-.student-card.cheating {
-  border-left: 4px solid #ef4444;
-  background-color: #fef2f2;
-}
-
-.student-card.disconnected {
-  border-left: 4px solid #6b7280;
-  opacity: 0.8;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
 }

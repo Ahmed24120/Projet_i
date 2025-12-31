@@ -3,29 +3,27 @@ import React from 'react';
 interface CardProps {
     children: React.ReactNode;
     className?: string;
-    hoverEffect?: boolean;
-    padding?: 'none' | 'sm' | 'md' | 'lg';
+    glass?: boolean;
+    hover?: boolean;
 }
 
-export function Card({ children, className = '', hoverEffect = false, padding = 'md' }: CardProps) {
-    const paddings = {
-        none: '',
-        sm: 'p-4',
-        md: 'p-6',
-        lg: 'p-8',
-    };
-
+export const Card: React.FC<CardProps> = ({
+    children,
+    className = '',
+    glass = false,
+    hover = false
+}) => {
     return (
-        <div
-            className={`
-        bg-white rounded-2xl shadow-sm border border-gray-100
-        transition-all duration-300
-        ${hoverEffect ? 'hover:shadow-lg hover:-translate-y-1' : ''}
-        ${paddings[padding]}
-        ${className}
-      `}
-        >
+        <div className={`
+      relative rounded-xl border 
+      ${glass
+                ? 'glass border-white/20'
+                : 'bg-white dark:bg-slate-900 border-border shadow-sm'
+            }
+      ${hover ? 'transition-transform duration-300 hover:-translate-y-1 hover:shadow-md' : ''}
+      ${className}
+    `}>
             {children}
         </div>
     );
-}
+};
