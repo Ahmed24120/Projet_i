@@ -17,6 +17,7 @@ type Exam = {
   date_debut?: string | null;
   date_fin?: string | null;
   sujet_path?: string | null;
+  status?: 'ready' | 'launched' | 'finished';
 };
 
 export default function ProfessorDashboard() {
@@ -224,6 +225,16 @@ export default function ProfessorDashboard() {
     }
     socket.emit("stop-exam", { examId: id });
     toast("🛑 Arrêt de l'examen...");
+  }
+
+  async function launchExam(id: number) {
+    try {
+      await apiFetch(`/exams/${id}/launch`, { method: 'PUT' });
+      toast("Examen publié avec succès ! 🚀");
+      loadExams();
+    } catch (e) {
+      toast("Erreur lors de la publication");
+    }
   }
 
   async function fetchResources(id: number) {
@@ -451,6 +462,8 @@ export default function ProfessorDashboard() {
                       <div className="flex items-center gap-3 mb-2">
                         <span className="bg-muted text-muted-foreground text-xs font-bold px-2 py-1 rounded">#{ex.id}</span>
                         <h3 className="text-xl font-bold text-foreground">{ex.titre || "Sans titre"}</h3>
+                        {ex.status === 'launched' && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full border border-green-200">Publié</span>}
+                        {ex.status === 'ready' && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full border border-gray-200">Brouillon</span>}
                       </div>
                       <p className="text-muted-foreground text-sm max-w-2xl">{ex.description || "Pas de description."}</p>
                     </div>
@@ -463,6 +476,11 @@ export default function ProfessorDashboard() {
                       <div className="h-8 w-px bg-border mx-2"></div>
                       <div className="flex items-center gap-2">
                         <Link href={`/professor/exams/${ex.id}`}><Button size="sm">Accéder</Button></Link>
+                        {ex.status !== 'launched' && (
+                          <Button size="sm" variant="outline" onClick={() => launchExam(ex.id)} className="text-indigo-600 hover:bg-indigo-50 border-indigo-200">
+                            🚀 Publier
+                          </Button>
+                        )}
                         <Button size="sm" variant="secondary" onClick={() => toggleImport(ex.id)}>Fichiers {isImportOpen ? '▲' : '▼'}</Button>
                         <Button size="sm" variant="danger" onClick={() => deleteExam(ex.id)}>🗑</Button>
                       </div>

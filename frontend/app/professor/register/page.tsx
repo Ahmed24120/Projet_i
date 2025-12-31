@@ -95,7 +95,7 @@ export default function ProfessorRegister() {
                             type="password"
                             value={formData.secretCode}
                             onChange={(e) => setFormData({ ...formData, secretCode: e.target.value })}
-                            placeholder="Ex: PSN..."
+                            placeholder=""
                             required
                             fullWidth
                             className="border-primary/30 focus:border-primary"

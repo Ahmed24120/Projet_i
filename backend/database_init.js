@@ -47,6 +47,22 @@ db.serialize(async () => {
         else console.log("✅ Students table ready.");
     });
 
+    // 2.5 Exams Table (Main table used in app)
+    db.run(`CREATE TABLE IF NOT EXISTS examen (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titre TEXT,
+        description TEXT,
+        date_debut TEXT,
+        date_fin TEXT,
+        sujet_path TEXT,
+        professor_id INTEGER,
+        room_number TEXT,
+        status TEXT DEFAULT 'ready'
+    )`, (err) => {
+        if (err) console.error("❌ Error creating examen table:", err.message);
+        else console.log("✅ Exams table ready.");
+    });
+
     // 3. Exam Sessions Table
     db.run(`CREATE TABLE IF NOT EXISTS exam_sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

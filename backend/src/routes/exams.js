@@ -71,9 +71,9 @@ router.get("/", authenticateToken, (req, res) => {
     sql += " AND professor_id = ?";
     params.push(id);
   } else if (role === 'student') {
-    // Les étudiants ne voient QUE les examens de leur salle (pas d'examens publics)
+    // Les étudiants ne voient QUE les examens de leur salle ET qui sont LANCÉS
     if (roomNumber) {
-      sql += " AND room_number = ?";
+      sql += " AND room_number = ? AND status = 'launched'";
       params.push(roomNumber);
     } else {
       // Sans numéro de salle, ne rien voir
@@ -132,9 +132,10 @@ router.post("/", authenticateToken, (req, res) => {
 
   if (!titre) return res.status(400).json({ error: "Titre requis" });
 
+  // On force le statut 'ready' à la création
   const sql = `
-    INSERT INTO examen (titre, description, date_debut, date_fin, sujet_path, professor_id, room_number)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO examen (titre, description, date_debut, date_fin, sujet_path, professor_id, room_number, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'ready')
   `;
 
   db.run(
@@ -142,9 +143,30 @@ router.post("/", authenticateToken, (req, res) => {
     [titre, description || "", date_debut || "", date_fin || "", sujet_path || "", req.user.id, req.body.roomNumber || null],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ id: this.lastID, titre, description, professor_id: req.user.id });
+      res.json({ id: this.lastID, titre, description, professor_id: req.user.id, status: 'ready' });
     }
   );
+});
+
+// Lancer (Publier) un examen
+router.put("/:id/launch", authenticateToken, (req, res) => {
+  const examId = req.params.id;
+
+  if (req.user.role !== 'professor') {
+    return res.status(403).json({ error: "Action non autorisée" });
+  }
+
+  // Vérifier propriété
+  db.get("SELECT professor_id FROM examen WHERE id = ?", [examId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: "Examen non trouvé" });
+    if (row.professor_id !== req.user.id) return res.status(403).json({ error: "Accès refusé" });
+
+    db.run("UPDATE examen SET status = 'launched' WHERE id = ?", [examId], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, message: "Examen lancé avec succès", status: 'launched' });
+    });
+  });
 });
 
 // Suppression d’un examen
@@ -317,6 +339,26 @@ router.get("/:id/submissions", authenticateToken, (req, res) => {
 
     res.json(results);
   });
+});
+
+// ✅ Nouveau : Télécharger un fichier de soumission (Force Download)
+router.get("/:id/submissions/download", authenticateToken, (req, res) => {
+  const examId = req.params.id;
+  const { matricule, filename } = req.query;
+
+  if (!matricule || !filename) {
+    return res.status(400).json({ error: "matricule et filename requis" });
+  }
+
+  const filePath = path.join(__dirname, "../../uploads/exams", String(examId), "students", matricule, filename);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "Fichier introuvable" });
+  }
+
+  // Force download with Content-Disposition: attachment
+  const cleanName = filename.replace(/^\d+_/, ''); // Remove timestamp prefix
+  res.download(filePath, cleanName);
 });
 
 // ✅ Nouveau : Lister les logs d'un examen

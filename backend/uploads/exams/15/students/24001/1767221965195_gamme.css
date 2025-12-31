@@ -1,0 +1,22 @@
+.continaire{
+    width: 255px;
+    font-family:system-ui;
+    font-size: 25px;
+    margin: auto;
+    font-weight: bold;
+    color: white;
+}
+.square{
+    width: 80px;
+    height: 80px;
+    float: left;
+    gap: 4px;
+    background-color: rgb(206, 47, 79);
+}
+.title{
+    background-color: rgb(206, 47, 79);
+}
+span{
+    color: chocolate;
+
+}

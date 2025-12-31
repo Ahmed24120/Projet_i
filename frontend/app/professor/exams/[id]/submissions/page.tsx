@@ -101,17 +101,8 @@ export default function ExamSubmissions() {
                                         </div>
                                         <div className="flex gap-2">
                                             <a
-                                                href={`${baseUrl}${file.url}`}
-                                                target="_blank"
+                                                href={`${baseUrl}/exams/${id}/submissions/download?matricule=${sub.matricule}&filename=${encodeURIComponent(file.url.split('/').pop() || '')}`}
                                                 className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Afficher"
-                                            >
-                                                👁️
-                                            </a>
-                                            <a
-                                                href={`${baseUrl}${file.url}`}
-                                                download
-                                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                                                 title="Télécharger"
                                             >
                                                 📥
