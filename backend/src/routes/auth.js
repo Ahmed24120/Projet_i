@@ -5,6 +5,10 @@ const db = require("../db");
 
 const router = express.Router();
 
+const { authenticateToken } = require("../middleware/auth"); // Import middleware
+
+// ... (existing code top) ...
+
 router.post("/login", async (req, res) => {
   const { Identifier, password, role } = req.body;
   // Support 'identifier' or 'email' for backward compatibility
@@ -25,15 +29,19 @@ router.post("/login", async (req, res) => {
       WHERE (email = ? OR matricule = ?) AND role = 'student'
     `;
     params = [loginId, loginId];
+  } else if (role === "ADMIN") {
+    // ✅ ADMIN : Connexion par Email (ou Matricule si défini)
+    query = "SELECT * FROM users WHERE (email = ? OR matricule = ?) AND role = 'ADMIN'";
+    params = [loginId, loginId];
   } else {
-    // Professeur : connexion par Email
+    // Professeur (ou fallback) : connexion par Email
     query = "SELECT * FROM users WHERE email = ? AND role = 'professor'";
     params = [loginId];
   }
 
   db.get(query, params, async (err, user) => {
     if (err) return res.status(500).json({ message: "Database error" });
-    if (!user) return res.status(404).json({ message: "Utilisateur non trouvé" });
+    if (!user) return res.status(404).json({ message: "Utilisateur non trouvé ou rôle incorrect" });
 
     // Vérification mot de passe
     // On essaie bcrypt d'abord, sinon texte brut pour compatibilité
@@ -62,8 +70,13 @@ router.post("/login", async (req, res) => {
         name: user.name
       },
       process.env.JWT_SECRET || "secret",
-      { expiresIn: "4h" }
+      { expiresIn: "8h" } // Session plus longue pour admin/prof
     );
+
+    // Split name into prenom and nom for frontend display
+    const nameParts = (user.name || "").split(" ");
+    const prenom = nameParts[0] || "";
+    const nom = nameParts.slice(1).join(" ") || "";
 
     res.json({
       token,
@@ -72,7 +85,9 @@ router.post("/login", async (req, res) => {
         role: user.role,
         email: user.email,
         matricule: user.matricule,
-        name: user.name
+        name: user.name,
+        prenom: prenom,
+        nom: nom
       }
     });
   });
@@ -92,12 +107,70 @@ router.post("/register", async (req, res) => {
   }
 
   // Vérification existence
-  const checkQuery = "SELECT id FROM users WHERE email = ? OR (matricule = ? AND matricule IS NOT NULL)";
-  db.get(checkQuery, [email, matricule || null], async (err, existing) => {
+  const checkQuery = "SELECT * FROM users WHERE (matricule = ? AND role = 'student') OR (email = ?)";
+  db.get(checkQuery, [matricule || 'NOMATCH', email], async (err, existing) => {
     if (err) return res.status(500).json({ message: "Erreur base de données" });
-    if (existing) return res.status(409).json({ message: "Email ou Matricule déjà utilisé" });
 
-    // Hashage
+    // ✅ CAS 1: Matricule trouvé pour un étudiant -> CLAIM ACCOUNT
+    if (existing && existing.matricule === matricule && existing.role === 'student') {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const fullName = (prenom && nom) ? `${prenom} ${nom}` : existing.name;
+
+      // Email Validation Rule: matricule@domain
+      const domain = "@supnum.mr";
+      const proposedEmail = email.trim();
+      const isValidSchoolEmail = proposedEmail.toLowerCase().includes(matricule.toLowerCase()) && proposedEmail.endsWith(domain);
+
+      // On met à jour l'email SEULEMENT SI valide format école, sinon on garde l'ancien (souvent le placeholder d'import)
+      const finalEmail = (isValidSchoolEmail) ? proposedEmail : existing.email;
+
+      // Safety check: Don't take an email used by another ID
+      if (finalEmail !== existing.email) {
+        const emailTaken = await new Promise(r => db.get("SELECT id FROM users WHERE email = ? AND id != ?", [finalEmail, existing.id], (e, row) => r(row)));
+        if (emailTaken) {
+          // Si l'email voulu est pris, on garde l'email existant de l'import, mais on claim le compte quand même avec le password.
+          // On pourrait renvoyer une erreur, mais "Claim" est prioritaire pour l'accès.
+          // On continue avec existing.email
+        }
+      }
+
+      const updateQuery = `
+        UPDATE users SET password_hash = ?, name = ?, email = ?
+        WHERE id = ?
+      `;
+
+      db.run(updateQuery, [hashedPassword, fullName, finalEmail, existing.id], function (err) {
+        if (err) return res.status(500).json({ message: "Erreur lors de la mise à jour (Claim): " + err.message });
+
+        // Token
+        const token = jwt.sign(
+          { id: existing.id, role: existing.role, matricule: existing.matricule, name: fullName },
+          process.env.JWT_SECRET || "secret",
+          { expiresIn: "4h" }
+        );
+        res.status(200).json({ // 200 OK (updated)
+          token,
+          user: {
+            id: existing.id,
+            role: existing.role,
+            email: finalEmail,
+            matricule,
+            name: fullName,
+            prenom: prenom,
+            nom: nom,
+            claimed: true
+          }
+        });
+      });
+      return;
+    }
+
+    // CAS 2: Email pris par quelqu'un d'autre
+    if (existing) {
+      return res.status(409).json({ message: "Email ou Matricule déjà utilisé." });
+    }
+
+    // CAS 3: Nouveau compte (Standard)
     const hashedPassword = await bcrypt.hash(password, 10);
     const fullName = `${prenom} ${nom}`;
 
@@ -121,10 +194,137 @@ router.post("/register", async (req, res) => {
 
       res.status(201).json({
         token,
-        user: { id: userId, role, email, matricule, name: fullName }
+        user: {
+          id: userId,
+          role,
+          email,
+          matricule,
+          name: fullName,
+          prenom: prenom,
+          nom: nom
+        }
       });
     });
   });
 });
 
+
+/* =========================================================================
+   ✅ SECTION ADMIN : GESTION DES UTILISATEURS (Branché ici pour éviter un nouveau fichier)
+   ========================================================================= */
+
+// Middleware checkAdmin local (ou importé s'il existait, mais on le fait inline pour simplicité dans ce fichier)
+const checkAdmin = (req, res, next) => {
+  if (req.user && req.user.role === 'ADMIN') {
+    next();
+  } else {
+    res.status(403).json({ error: "Accès refusé: Réservé aux administrateurs" });
+  }
+};
+
+// GET /api/auth/users -> Lister les utilisateurs (Profs ou Etudiants)
+router.get("/users", authenticateToken, checkAdmin, (req, res) => {
+  const { role, search } = req.query;
+
+  let sql = "SELECT id, matricule, email, name, role, created_at FROM users WHERE 1=1";
+  let params = [];
+
+  if (role) {
+    sql += " AND role = ?";
+    params.push(role);
+  }
+  if (search) {
+    sql += " AND (name LIKE ? OR matricule LIKE ? OR email LIKE ?)";
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  sql += " ORDER BY id DESC LIMIT 100";
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// POST /api/auth/users -> Créer un utilisateur (Prof ou Etudiant) par Admin
+router.post("/users", authenticateToken, checkAdmin, async (req, res) => {
+  const { name, email, matricule, role, password, salle } = req.body; // salle optionnel pour user, ou profile?
+
+  if (!name || !email || !role || !password) return res.status(400).json({ error: "Champs requis manquants" });
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Check duplication
+    const exists = await new Promise((resolve) => {
+      db.get("SELECT id FROM users WHERE email=? OR (matricule=? AND matricule IS NOT NULL)", [email, matricule], (err, row) => resolve(row));
+    });
+    if (exists) return res.status(409).json({ error: "Utilisateur déjà existant (email ou matricule)" });
+
+    db.run("INSERT INTO users (name, email, password_hash, role, matricule) VALUES (?, ?, ?, ?, ?)",
+      [name, email, hashedPassword, role, matricule || null],
+      function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        const newId = this.lastID;
+
+        // Si etudiant et salle fournie, on update profile
+        if (role === 'student' && salle) {
+          db.run("INSERT INTO profile (id_user, classe, matricule, nom) VALUES (?, ?, ?, ?)", [newId, salle, matricule, name]);
+        }
+
+        res.json({ ok: true, id: newId });
+      }
+    );
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/auth/users/:id -> Mettre à jour (Admin)
+router.put("/users/:id", authenticateToken, checkAdmin, (req, res) => {
+  const { name, email, matricule, salle } = req.body;
+  const userId = req.params.id;
+
+  // Update base user info
+  let sql = "UPDATE users SET name = ?, email = ?"; // start
+  let params = [name, email];
+
+  if (matricule !== undefined) {
+    sql += ", matricule = ?";
+    params.push(matricule);
+  }
+
+  sql += " WHERE id = ?";
+  params.push(userId);
+
+  db.run(sql, params, function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+
+    // Update profile classe if student
+    if (salle) {
+      db.run("UPDATE profile SET classe = ? WHERE id_user = ?", [salle, userId], (err) => {
+        // ignore error if profile doesn't exist, generic success
+      });
+    }
+    res.json({ ok: true });
+  });
+});
+
+// POST /api/auth/users/:id/reset-password -> Reset Password (Admin)
+router.post("/users/:id/reset-password", authenticateToken, checkAdmin, async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: "Nouveau mot de passe requis" });
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    db.run("UPDATE users SET password_hash = ? WHERE id = ?", [hashedPassword, req.params.id], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ ok: true });
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
+

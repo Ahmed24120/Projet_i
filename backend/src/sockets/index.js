@@ -130,6 +130,11 @@ function initSocket(server) {
         if (timeLeft <= 0) {
           clearInterval(intervalId);
           activeExams.delete(id);
+
+          // UPDATE DB STATUS
+          const nowISO = new Date().toISOString();
+          db.run("UPDATE examen SET status_code=4, status='finished', finished_at=? WHERE id=?", [nowISO, id]);
+
           io.emit("exam-ended", { examId: id });
           io.to(`exam:${id}`).emit("exam-ended", { examId: id });
           console.log(`🏁 Exam ${id} finished`);
@@ -151,6 +156,10 @@ function initSocket(server) {
 
       activeExams.set(id, { endTime, intervalId });
 
+      // UPDATE DB STATUS
+      const nowISO = new Date().toISOString();
+      db.run("UPDATE examen SET status_code=2, status='launched', started_at=? WHERE id=?", [nowISO, id]);
+
       const startedPayload = { examId: id, endAt: endTime };
       io.emit("exam-started", startedPayload);
       console.log(`⏱️ Exam ${id} started via server timer -> ends at ${new Date(endTime).toLocaleTimeString()}`);
@@ -164,9 +173,32 @@ function initSocket(server) {
         clearInterval(data.intervalId);
         activeExams.delete(id);
       }
+
+      // UPDATE DB STATUS
+      const nowISO = new Date().toISOString();
+      db.run("UPDATE examen SET status_code=3, status='stopped', stopped_at=? WHERE id=?", [nowISO, id]);
+
       io.emit("exam-stopped", { examId: id });
       io.to(`exam:${id}`).emit("exam-stopped", { examId: id });
       console.log(`⏹️ Exam ${id} stopped manually`);
+    });
+
+    socket.on("finish-exam-manual", ({ examId }) => {
+      console.log(`📡 Event: finish-exam-manual | examId: ${examId}`);
+      const id = Number(examId);
+      const data = activeExams.get(id);
+      if (data) {
+        clearInterval(data.intervalId);
+        activeExams.delete(id);
+      }
+
+      // UPDATE DB STATUS (4 = Finished)
+      const nowISO = new Date().toISOString();
+      db.run("UPDATE examen SET status_code=4, status='finished', finished_at=? WHERE id=?", [nowISO, id]);
+
+      io.emit("exam-ended", { examId: id });
+      io.to(`exam:${id}`).emit("exam-ended", { examId: id });
+      console.log(`🏁 Exam ${id} finished manually`);
     });
 
     socket.on("cheat-alert", (payload) => {
@@ -269,6 +301,59 @@ function initSocket(server) {
         });
         io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
       }
+    });
+
+    socket.on("student-exit", ({ examId, studentId, matricule }) => {
+      console.log(`📡 Event: student-exit | examId: ${examId}, studentId: ${studentId}, matricule: ${matricule}`);
+
+      const nowISO = new Date().toISOString();
+
+      // 1. Marquer la sortie dans exam_results
+      const exitSql = `
+        INSERT INTO exam_results (exam_id, student_id, has_exited, exited_at, is_finalized) 
+        VALUES (?, ?, 1, ?, 0)
+        ON CONFLICT(exam_id, student_id) 
+        DO UPDATE SET has_exited=1, exited_at=?
+      `;
+
+      db.run(exitSql, [examId, studentId, nowISO, nowISO], (err) => {
+        if (err) console.error("❌ Error marking student exit:", err);
+        else console.log(`✅ Student ${matricule} marked as exited from exam ${examId}`);
+      });
+
+      // 2. Logger l'événement
+      db.run(`
+        INSERT INTO logs (exam_id, student_id, matricule, type, message, timestamp)
+        VALUES (?, ?, ?, 'exit', 'Étudiant sorti de l''examen', ?)
+      `, [examId, studentId, matricule, nowISO]);
+
+      // 3. Mettre à jour le statut dans studentsPresence
+      const student = studentsPresence.get(String(studentId));
+      if (student) {
+        student.status = 'exited';
+        student.hasExited = true;
+        student.exitedAt = nowISO;
+      }
+
+      // 4. Notifier le professeur
+      io.to('professors').emit('student-exited', {
+        examId,
+        studentId,
+        matricule,
+        timestamp: nowISO
+      });
+
+      io.to('professors').emit('alert', {
+        type: 'STUDENT_EXIT',
+        message: `🚪 L'étudiant ${matricule} est sorti de l'examen`,
+        level: 'warning',
+        studentId,
+        examId
+      });
+
+      io.to('professors').emit('update-student-list', Array.from(studentsPresence.values()));
+
+      console.log(`🚪 Student ${matricule} exited exam ${examId}`);
     });
 
     socket.on("disconnect", () => {

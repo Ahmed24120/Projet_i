@@ -74,16 +74,16 @@ export default function ProfessorLoginPage() {
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/20 rounded-full blur-[100px] opacity-50 translate-y-1/3 -translate-x-1/4 animate-float" style={{ animationDelay: '2s' }}></div>
       </div>
 
-      <div className="relative flex w-full max-w-5xl bg-white dark:bg-slate-900/90 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden border border-white/10 z-10 mx-4 min-h-[600px]">
+      <div className="relative flex w-full max-w-5xl bg-white backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden border border-white/10 z-10 mx-4 min-h-[600px]">
 
         {/* LEFT SIDE: Form */}
         <div className="w-full md:w-1/2 p-10 flex flex-col justify-center relative z-20">
           <div className="text-center md:text-left mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-2xl mb-4 text-primary">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-50 text-2xl mb-4 text-indigo-600">
               👨‍🏫
             </div>
-            <h2 className="text-3xl font-bold text-foreground">Espace Professeur</h2>
-            <p className="text-sm text-muted-foreground mt-2">Gérez vos classes et examens en toute sécurité.</p>
+            <h2 className="text-3xl font-bold text-gray-900">Espace Professeur</h2>
+            <p className="text-sm text-gray-500 mt-2">Gérez vos classes et examens en toute sécurité.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -118,10 +118,10 @@ export default function ProfessorLoginPage() {
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer group">
-                <input type="checkbox" className="w-4 h-4 rounded border-input text-primary focus:ring-ring transition-colors" />
-                <span className="text-muted-foreground group-hover:text-foreground transition-colors">Se souvenir de moi</span>
+                <input type="checkbox" className="w-4 h-4 rounded border-input text-indigo-600 focus:ring-indigo-500 transition-colors" />
+                <span className="text-gray-500 group-hover:text-gray-900 transition-colors">Se souvenir de moi</span>
               </label>
-              <a href="#" className="text-primary hover:underline font-medium transition-all">
+              <a href="#" className="text-indigo-600 hover:underline font-medium transition-all">
                 Mot de passe oublié ?
               </a>
             </div>
@@ -129,20 +129,20 @@ export default function ProfessorLoginPage() {
             <Button
               type="submit"
               isLoading={loading || switching}
-              className="w-full"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-6 font-bold shadow-lg shadow-indigo-200"
               size="lg"
             >
               Se Connecter
             </Button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-border text-center md:hidden flex flex-col gap-3">
-            <Link href="/professor/register" className="text-sm font-medium text-primary hover:underline">
+          <div className="mt-8 pt-6 border-t border-gray-100 text-center md:hidden flex flex-col gap-3">
+            <Link href="/professor/register" className="text-sm font-bold text-indigo-600 hover:underline">
               Créer un compte professeur
             </Link>
             <button
               onClick={goToStudent}
-              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+              className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors"
               disabled={switching}
             >
               Vous êtes étudiant ? Accédez à l'espace étudiant
@@ -151,18 +151,18 @@ export default function ProfessorLoginPage() {
         </div>
 
         {/* RIGHT SIDE: Decoration (Hidden on Mobile) */}
-        <div className="hidden md:flex w-1/2 bg-gradient-to-br from-slate-900 to-slate-800 text-white p-12 flex-col justify-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary opacity-20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500 opacity-10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2"></div>
+        <div className="hidden md:flex w-1/2 bg-gradient-to-br from-indigo-600 to-blue-500 text-white p-12 flex-col justify-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-900/20 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2"></div>
 
           <div className="relative z-10">
-            <h1 className="text-4xl font-bold mb-6 leading-tight">L'excellence académique à portée de main.</h1>
-            <p className="text-lg text-slate-300 mb-10 leading-relaxed">
+            <h1 className="text-4xl font-black mb-6 leading-tight">L'excellence académique à portée de main.</h1>
+            <p className="text-lg text-indigo-100 mb-10 leading-relaxed font-medium opacity-90">
               Une plateforme unifiée pour créer, surveiller et noter vos examens avec une efficacité inégalée.
             </p>
 
             <Link href="/professor/register">
-              <button className="mb-4 w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 rounded-xl font-medium transition-all">
+              <button className="mb-4 w-full bg-white/20 hover:bg-white/30 border border-white/20 text-white py-4 rounded-xl font-bold transition-all backdrop-blur-sm shadow-sm">
                 Créer un compte professeur
               </button>
             </Link>
@@ -170,10 +170,10 @@ export default function ProfessorLoginPage() {
             <button
               type="button"
               onClick={goToStudent}
-              className="group flex items-center gap-3 w-fit px-6 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-medium"
+              className="group flex items-center gap-3 w-fit px-6 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold"
               disabled={switching}
             >
-              <span className="bg-white text-slate-900 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">🎓</span>
+              <span className="bg-white text-indigo-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">🎓</span>
               <span>Espace Étudiant</span>
             </button>
           </div>

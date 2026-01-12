@@ -18,7 +18,7 @@ export const Card: React.FC<CardProps> = ({
       relative rounded-xl border 
       ${glass
                 ? 'glass border-white/20'
-                : 'bg-white dark:bg-slate-900 border-border shadow-sm'
+                : 'bg-white border-border shadow-sm'
             }
       ${hover ? 'transition-transform duration-300 hover:-translate-y-1 hover:shadow-md' : ''}
       ${className}

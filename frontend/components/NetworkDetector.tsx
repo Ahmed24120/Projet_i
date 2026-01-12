@@ -74,7 +74,7 @@ export default function NetworkDetector({ role }: { role: 'student' | 'professor
                 status?.isLocal && (
                     <div className="bg-green-600 text-white px-3 py-1 rounded-full shadow-lg text-xs flex items-center opacity-75 hover:opacity-100 transition">
                         <span className="w-2 h-2 bg-white rounded-full ml-2 animate-pulse"></span>
-                        شبكة محلية آمنة
+                        Réseau Local Sécurisé
                     </div>
                 )
             )}

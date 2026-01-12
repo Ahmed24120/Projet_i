@@ -37,7 +37,7 @@ export const Input: React.FC<InputProps> = ({
           transition-all duration-200
           ${error
             ? 'border-destructive focus-visible:ring-destructive'
-            : 'border-input hover:border-slate-400 dark:hover:border-slate-600'
+            : 'border-input hover:border-slate-400'
           }
           ${className}
         `}

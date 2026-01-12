@@ -42,6 +42,23 @@ export async function apiFetch<T>(
 }
 
 /**
+ * Admin login
+ */
+export async function loginAdmin(
+  email: string,
+  password: string
+) {
+  return apiFetch<{ token: string; user: any }>(`/auth/login`, {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password,
+      role: "ADMIN",
+    }),
+  });
+}
+
+/**
  * Professor login
  */
 export async function loginProfessor(

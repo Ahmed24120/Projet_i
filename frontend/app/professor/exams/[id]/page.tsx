@@ -50,7 +50,13 @@ export default function ProfessorMonitor() {
         setUserRoom(room);
 
         if (token) {
-            apiFetch(`/exams/${id}`, {}, token).then((d: any) => setExamTitle(d.titre)).catch(() => { });
+            apiFetch(`/exams/${id}`, {}, token).then((d: any) => {
+                setExamTitle(d.titre);
+                if (d.status === 'finished' || d.status === 'stopped' || (d.status_code && d.status_code >= 3)) {
+                    setIsEnded(true);
+                    setTimerStr("Terminé");
+                }
+            }).catch(() => { });
         }
 
         async function loadLogs() {
@@ -262,6 +268,32 @@ export default function ProfessorMonitor() {
 
     const onlineCount = Object.values(students).filter(s => s.status === 'online').length;
 
+    const handleDownloadAll = () => {
+        const token = localStorage.getItem("token");
+        // We use window.open with a query param if needed, or better, use a temporary anchor or direct fetch
+        // For download with auth, we can't easily use window.open if cookies aren't used.
+        // But here we might assume token is needed in header.
+        // The backend route router.get("/:id/export", authenticateToken...) suggests we need header.
+        // Best approach: apiFetch with blob, then download.
+        toast("Préparation du téléchargement...");
+        fetch(`${baseUrl}/exams/${id}/export`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(async (res) => {
+                if (!res.ok) throw new Error(await res.text());
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `examen_${id}_export.zip`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                toast("Téléchargement démarré ✅");
+            })
+            .catch(e => toast("Erreur téléchargement: " + e.message));
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-50 flex flex-col font-sans">
             {/* Header */}
@@ -279,11 +311,19 @@ export default function ProfessorMonitor() {
                     </div>
                     <div>
                         <h1 className="text-xl font-black bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent">{examTitle || 'Surveillance Examen'}</h1>
-                        <p className="text-xs text-gray-600 font-medium">Tableau de bord en temps réel {userRoom && `- Salle ${userRoom}`}</p>
+                        <p className="text-xs text-gray-600 font-medium">Tableau de bord {userRoom && `- Salle ${userRoom}`}</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-6">
+                    {isEnded && (
+                        <button
+                            onClick={handleDownloadAll}
+                            className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 shadow-md flex items-center gap-2 text-sm"
+                        >
+                            <span>📦</span> Tout télécharger
+                        </button>
+                    )}
                     <div className={`px-4 py-2 rounded-xl font-mono text-xl font-bold tracking-widest shadow-md ${isEnded ? 'bg-red-100 text-red-600' : 'bg-sky-100 text-sky-700'}`}>
                         {timerStr}
                     </div>

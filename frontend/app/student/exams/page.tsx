@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Input } from "@/components/ui/Input";
 import { toast } from "@/components/ui/Toast";
+import { Search, LogOut, Clock, ShieldCheck, DoorOpen, Smile, Frown } from "lucide-react";
 
 type Exam = {
   id: number;
@@ -17,6 +18,7 @@ type Exam = {
   description: string;
   date_debut?: string;
   date_fin?: string;
+  status_code?: number;
 };
 
 export default function StudentExams() {
@@ -55,19 +57,13 @@ export default function StudentExams() {
     });
 
     socket.on("exam-ended", (p) => {
-      setActiveExamsMap(prev => {
-        const copy = { ...prev };
-        delete copy[p.examId];
-        return copy;
-      });
+      setActiveExamsMap(prev => { const copy = { ...prev }; delete copy[p.examId]; return copy; });
+      loadExams(token); // Refresh list to remove if needed
     });
 
     socket.on("exam-stopped", (p) => {
-      setActiveExamsMap(prev => {
-        const copy = { ...prev };
-        delete copy[p.examId];
-        return copy;
-      });
+      setActiveExamsMap(prev => { const copy = { ...prev }; delete copy[p.examId]; return copy; });
+      loadExams(token); // Refresh list to remove it
     });
 
     return () => {
@@ -98,116 +94,115 @@ export default function StudentExams() {
     router.push("/student/login");
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-white">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
   const filteredExams = exams.filter(ex =>
     ex.titre.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><LoadingSpinner size="lg" /></div>;
 
-        {/* Header */}
-        <header className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-sky-100">
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+
+      {/* Header */}
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-sky-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-200">
               {user?.prenom?.[0] || "E"}
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent">
-                Bienvenue, {user?.prenom || "Étudiant"} 👋
+              <h1 className="font-bold text-lg text-gray-900 leading-tight">
+                {user?.prenom && user?.nom ? `${user.prenom} ${user.nom}` : "Espace Étudiant"}
               </h1>
-              <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                {user?.matricule ? `Matricule : ${user.matricule}` : "Compte Étudiant"}
+              <p className="text-xs text-gray-500 font-medium">
+                {user?.matricule ? `Matricule: ${user.matricule}` : "Bonne chance !"}
               </p>
             </div>
           </div>
-          <Button onClick={logout} variant="danger" className="shadow-md hover:shadow-lg transition-all">
-            Déconnexion
+
+          <Button onClick={logout} variant="ghost" className="text-red-400 hover:text-red-500 hover:bg-red-50 gap-2">
+            <LogOut size={18} />
+            <span className="hidden sm:inline">Déconnexion</span>
           </Button>
-        </header>
+        </div>
+      </header>
 
-        <section>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-3">
-              <span className="text-4xl">📚</span> Examens Disponibles
-            </h2>
+      <main className="max-w-7xl mx-auto px-6 py-12">
 
-            <div className="w-full md:w-auto md:min-w-[300px]">
-              <Input
-                placeholder="Rechercher un examen..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full border-sky-200 focus:border-sky-400 focus:ring-sky-400"
-                fullWidth
-              />
-            </div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-12">
+          <div className="space-y-2">
+            <h2 className="text-4xl font-black text-gray-900 tracking-tight">Examens Disponibles</h2>
+            <p className="text-gray-500 font-medium">Sélectionnez un examen pour commencer.</p>
           </div>
 
+          <div className="relative group w-full md:w-96">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={20} />
+            <input
+              type="text"
+              placeholder="Rechercher un examen..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-100 outline-none transition-all shadow-sm font-medium"
+            />
+          </div>
+        </div>
+
+        {filteredExams.length === 0 && !loading ? (
+          <div className="text-center py-24 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm">
+            <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Frown size={40} className="text-gray-300" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Aucun examen trouvé</h3>
+            <p className="text-gray-500 max-w-md mx-auto">Il semble qu'aucun examen ne soit disponible pour le moment or ne corresponde à votre recherche.</p>
+          </div>
+        ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredExams.map((exam) => {
               const isActive = !!activeExamsMap[exam.id];
+              // Hide finished exams from student view to avoid confusion? 
+              // Or show them as disabled/history?
+              // User asked "verifier si les examens finis apparaissent normalement CHEZ LE PROF". For students, usually we only show active ones.
+              // But let's keep them visible if backend sends them, just styled.
+
               return (
-                <Card key={exam.id} hover className={`flex flex-col h-full border-t-4 shadow-lg hover:shadow-xl transition-all duration-300 bg-white ${isActive ? 'border-t-sky-500' : 'border-t-gray-300'}`}>
-                  <div className="flex-1 p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isActive ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {isActive ? '🟢 En cours' : '⏳ Disponible'}
-                      </span>
-                      <span className="text-xs text-gray-500 font-mono bg-gray-50 px-2 py-1 rounded">#{exam.id}</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2 flex-wrap">
-                      {exam.titre}
-                      {(exam as any).room_number && (
-                        <span className="text-xs bg-sky-100 text-sky-700 px-2 py-1 rounded-full font-semibold">
-                          🚪 Salle {(exam as any).room_number}
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-sm text-gray-600 line-clamp-3 mb-6 leading-relaxed">
-                      {exam.description || "Aucune description disponible pour cet examen."}
-                    </p>
+                <div key={exam.id} className="group bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col relative overflow-hidden">
+                  {isActive && <div className="absolute top-0 inset-x-0 h-1.5 bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]"></div>}
+
+                  <div className="flex justify-between items-start mb-6">
+                    <span className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {isActive ? <><Clock size={12} className="animate-spin-slow" /> En Cours</> : 'En Attente'}
+                    </span>
+                    <span className="text-gray-300 font-mono text-xs">#{exam.id}</span>
                   </div>
 
-                  <div className="p-6 pt-0 mt-auto">
-                    <div className="flex items-center justify-between mb-4 text-xs font-medium text-gray-500">
-                      <span className="flex items-center gap-1">⏱️ Temps réel</span>
-                      <span className="flex items-center gap-1">🔒 Sécurisé</span>
-                    </div>
-                    <Link href={`/student/exams/${exam.id}`} className="block">
-                      <Button className="w-full bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-blue-600 shadow-md hover:shadow-lg transition-all" size="lg">
-                        Rejoindre l'examen ✍️
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors leading-tight">{exam.titre}</h3>
+                  <p className="text-sm text-gray-500 line-clamp-3 mb-8 flex-1 leading-relaxed">
+                    {exam.description || "Pas de description fournie pour cet examen."}
+                  </p>
+
+                  {isActive ? (
+                    <Link href={`/student/exams/${exam.id}`} className="block mt-auto">
+                      <Button className="w-full py-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-blue-300 font-bold text-lg group-hover:scale-[1.02] transition-transform">
+                        Commencer l'examen
                       </Button>
                     </Link>
+                  ) : (
+                    <Button disabled className="w-full py-6 rounded-xl bg-gray-100 text-gray-400 font-bold border border-gray-200 cursor-not-allowed mt-auto">
+                      Pas encore commencé
+                    </Button>
+                  )}
+
+                  <div className="mt-6 pt-6 border-t border-gray-50 flex items-center gap-4 text-xs font-bold text-gray-400 uppercase tracking-wider justify-center">
+                    <span className="flex items-center gap-1"><ShieldCheck size={14} /> Sécurisé</span>
+                    <span className="w-1 h-1 rounded-full bg-gray-200"></span>
+                    <span className="flex items-center gap-1"><DoorOpen size={14} /> {(exam as any).room_number ? `Salle ${(exam as any).room_number}` : 'Présentiel'}</span>
                   </div>
-                </Card>
+                </div>
               )
             })}
-
-            {exams.length === 0 && (
-              <div className="col-span-full py-20 text-center bg-white/80 backdrop-blur-sm rounded-3xl border-2 border-dashed border-sky-200 shadow-lg">
-                <div className="text-6xl mb-6 opacity-80">📚</div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">Aucun examen disponible</h3>
-                <p className="text-gray-600">Les examens de votre salle apparaîtront ici une fois créés.</p>
-              </div>
-            )}
-
-            {exams.length > 0 && filteredExams.length === 0 && (
-              <div className="col-span-full py-12 text-center text-gray-600 bg-white/50 rounded-xl">
-                Aucun examen ne correspond à votre recherche.
-              </div>
-            )}
           </div>
-        </section>
-      </div>
+        )}
+      </main>
     </div>
   );
 }

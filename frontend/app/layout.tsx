@@ -4,7 +4,7 @@ import { ToastHost } from "@/components/ui/Toast";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
+      <body className="min-h-screen bg-gray-50 font-sans">
         <ToastHost />
         {children}
       </body>
