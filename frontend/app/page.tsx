@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ShieldCheck, GraduationCap, Users, Play, ArrowRight, Github } from "lucide-react";
@@ -26,20 +27,21 @@ export default function Home() {
       <main className="container px-6 py-24 mx-auto flex flex-col items-center relative z-10 animate-fade-in-up">
 
         {/* Hero Section */}
-        <div className="text-center mb-20 space-y-8 max-w-4xl">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-50 border border-gray-200 text-gray-600 text-xs font-bold uppercase tracking-widest hover:bg-white hover:shadow-md transition-all cursor-default">
+        <div className="text-center mb-12 space-y-6 max-w-4xl flex flex-col items-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-50 border border-gray-200 text-gray-600 text-xs font-bold uppercase tracking-widest hover:bg-white hover:shadow-md transition-all cursor-default mb-4">
             <ShieldCheck size={14} className="text-green-500" />
             Plateforme d'Examen Sécurisée v2.0
           </div>
 
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-gray-900 leading-[1.1] mb-6">
-            L'excellence <br />
-            <span className="text-blue-600">sans compromis.</span>
-          </h1>
-
-          <p className="text-xl md:text-2xl text-gray-500 leading-relaxed max-w-2xl mx-auto font-medium">
-            Une expérience d'évaluation fluide, moderne et anti-triche pour propulser vos examens vers le futur.
-          </p>
+          <div className="relative w-64 h-64 md:w-80 md:h-80 mx-auto">
+            <Image
+              src="/logo_supnum.png"
+              alt="SupNum Logo"
+              fill
+              className="object-contain drop-shadow-xl"
+              priority
+            />
+          </div>
         </div>
 
         {/* Choice Cards */}
@@ -85,21 +87,21 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Espace Admin (NEW) */}
-          <div className="group relative bg-gray-900 rounded-[2.5rem] p-8 border border-gray-800 shadow-2xl shadow-gray-900/20 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 overflow-hidden flex flex-col">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gray-800 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-gray-700 transition-colors opacity-50"></div>
+          {/* Espace Admin (Updated to match design) */}
+          <div className="group relative bg-white rounded-[2.5rem] p-8 border border-gray-200 shadow-2xl shadow-gray-200/50 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 overflow-hidden flex flex-col">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-purple-100 transition-colors"></div>
 
             <div className="relative z-10 flex-1 flex flex-col">
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-900/50 rotate-3 group-hover:rotate-0 transition-transform">
+              <div className="w-16 h-16 bg-white border-2 border-gray-100 text-purple-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-gray-200 rotate-3 group-hover:rotate-6 transition-transform">
                 <ShieldCheck size={32} />
               </div>
-              <h2 className="text-2xl font-black mb-3 text-white">Espace Admin</h2>
-              <p className="text-gray-400 text-sm mb-8 leading-relaxed font-medium flex-1">
+              <h2 className="text-2xl font-black mb-3 text-gray-900">Espace Admin</h2>
+              <p className="text-gray-500 text-sm mb-8 leading-relaxed font-medium flex-1">
                 Gérez les utilisateurs, surveillez la plateforme et accédez aux archives globales.
               </p>
               <Link href="/admin/login">
-                <Button variant="secondary" className="w-full py-6 text-base rounded-2xl bg-white hover:bg-gray-100 text-gray-900 shadow-lg transition-all group-hover:shadow-white/10 flex items-center justify-center gap-2">
-                  Connexion <ShieldCheck size={18} />
+                <Button variant="outline" className="w-full py-6 text-base rounded-2xl bg-white text-purple-600 border-2 border-purple-50 hover:border-purple-100 hover:bg-purple-50 shadow-lg transition-all flex items-center justify-center gap-2">
+                  Connexion <ArrowRight size={18} />
                 </Button>
               </Link>
             </div>

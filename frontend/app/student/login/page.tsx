@@ -151,15 +151,27 @@ export default function StudentLogin() {
               </button>
             </Link>
 
-            <Link href="/professor/login" className="no-underline block w-fit">
-              <button
-                type="button"
-                className="group flex items-center gap-3 px-6 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold"
-              >
-                <span className="bg-white text-blue-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">👨‍🏫</span>
-                <span>Espace Professeur</span>
-              </button>
-            </Link>
+            <div className="flex gap-4 flex-wrap">
+              <Link href="/professor/login" className="no-underline block">
+                <button
+                  type="button"
+                  className="group flex items-center gap-3 px-5 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold"
+                >
+                  <span className="bg-white text-blue-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">👨‍🏫</span>
+                  <span>Espace Professeur</span>
+                </button>
+              </Link>
+
+              <Link href="/admin/login" className="no-underline block">
+                <button
+                  type="button"
+                  className="group flex items-center gap-3 px-5 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold"
+                >
+                  <span className="bg-white text-blue-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">🛡️</span>
+                  <span>Espace Admin</span>
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
 

@@ -30,6 +30,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     if (!isAdmin) return null; // or loading spinner
 
+    if (pathname?.includes("/login")) {
+        return <>{children}</>;
+    }
+
     const navItems = [
         { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
         { href: "/admin/users", label: "Utilisateurs", icon: Users },

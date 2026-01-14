@@ -167,15 +167,26 @@ export default function ProfessorLoginPage() {
               </button>
             </Link>
 
-            <button
-              type="button"
-              onClick={goToStudent}
-              className="group flex items-center gap-3 w-fit px-6 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold"
-              disabled={switching}
-            >
-              <span className="bg-white text-indigo-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">🎓</span>
-              <span>Espace Étudiant</span>
-            </button>
+            <div className="flex gap-4 mt-6">
+              <button
+                type="button"
+                onClick={goToStudent}
+                className="group flex items-center gap-3 px-5 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold"
+                disabled={switching}
+              >
+                <span className="bg-white text-indigo-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">🎓</span>
+                <span>Espace Étudiant</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push('/admin/login')}
+                className="group flex items-center gap-3 px-5 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold"
+              >
+                <span className="bg-white text-indigo-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">🛡️</span>
+                <span>Espace Admin</span>
+              </button>
+            </div>
           </div>
         </div>
 

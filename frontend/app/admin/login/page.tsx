@@ -63,7 +63,7 @@ export default function AdminLoginPage() {
                             type="text"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
-                            placeholder="admin@supnum.mr"
+                            placeholder=""
                             required
                             fullWidth
                         />
@@ -95,22 +95,42 @@ export default function AdminLoginPage() {
                 </div>
 
                 {/* RIGHT SIDE: Decoration (Hidden on Mobile) */}
-                <div className="hidden md:flex w-1/2 bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-12 flex-col justify-center relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2"></div>
+                <div className="hidden md:flex w-1/2 bg-gradient-to-br from-indigo-600 to-blue-500 text-white p-12 flex-col justify-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-900/20 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2"></div>
 
                     <div className="relative z-10">
                         <h1 className="text-4xl font-black mb-6 leading-tight">Administration Centralisée.</h1>
-                        <p className="text-lg text-gray-300 mb-10 leading-relaxed font-medium opacity-90">
+                        <p className="text-lg text-indigo-100 mb-10 leading-relaxed font-medium opacity-90">
                             Gérez les utilisateurs, surveillez les examens en temps réel et assurez le bon fonctionnement de la plateforme.
                         </p>
 
-                        <div className="p-4 bg-white/5 backdrop-blur-md rounded-xl border border-white/10">
-                            <div className="flex items-center gap-3 mb-2">
-                                <ShieldCheck className="text-green-400" size={20} />
-                                <span className="font-bold text-sm">Système Sécurisé</span>
+                        <div className="flex flex-col gap-4">
+                            <div className="p-4 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 mb-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <ShieldCheck className="text-white" size={20} />
+                                    <span className="font-bold text-sm text-white">Système Sécurisé</span>
+                                </div>
+                                <p className="text-xs text-indigo-100">Accès restreint aux administrateurs autorisés uniquement.</p>
                             </div>
-                            <p className="text-xs text-gray-400">Accès restreint aux administrateurs autorisés uniquement.</p>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => router.push('/professor/login')}
+                                    className="group flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold text-center"
+                                >
+                                    <span className="bg-white text-indigo-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">👨‍🏫</span>
+                                    <span className="text-sm">Espace Professeur</span>
+                                </button>
+
+                                <button
+                                    onClick={() => router.push('/student/login')}
+                                    className="group flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all font-bold text-center"
+                                >
+                                    <span className="bg-white text-blue-600 w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">🎓</span>
+                                    <span className="text-sm">Espace Étudiant</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
