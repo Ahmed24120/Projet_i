@@ -1,56 +1,73 @@
-# 🎓 SupNum Exam Manager - Système d'Examen Sécurisé
+# 🎓 Système d'Examen Sécurisé
 
-Bienvenue dans le projet **SupNum Exam Manager**. Cette plateforme moderne et sécurisée est conçue pour la gestion complète du cycle des examens, de la création à l'évaluation, avec une surveillance en temps réel avancée.
-
-![SupNum Logo](frontend/public/logo_supnum.png)
-
-## ✨ Caractéristiques Principales
-
-### 🏛️ Architecture Multi-Portails
-- **Portail Étudiant :** Interface épurée pour passer les examens, soumettre les travaux et consulter les résultats.
-- **Portail Professeur :** Tableau de bord SaaS moderne pour la création d'examens, la gestion des ressources et la surveillance en direct.
-- **Portail Administrateur :** Gestion centralisée des utilisateurs (Étudiants, Professeurs, Admins) et des archives.
-
-### 🔒 Sécurité et Anti-Triche Pro-actifs
-- **Détection de Fraude :** Surveillance en temps réel des changements d'onglets, sorties de plein écran et déconnexions.
-- **Alertes Instantanées :** Notification immédiate des professeurs via WebSockets en cas de comportement suspect.
-- **Contrôle d'Accès :** Gestion granulaire des accès aux examens par salle et par étudiant.
-
-### 🎨 Expérience Utilisateur Moderne
-- **Design SaaS :** Interface basée sur le Glassmorphisme avec des animations fluides (Framer Motion).
-- **Responsive Design :** Optimisé pour tous les écrans, du mobile au desktop.
-- **Identité Visuelle :** Intégration complète de la charte graphique SupNum.
+Bienvenue dans le projet de système d'examen sécurisé. Ce projet comprend un **Backend** (API & WebSockets) et un **Frontend** (Interface Next.js).
 
 ## 📁 Structure du Projet
 
-- `backend/` : Serveur Node.js/Express, API REST, WebSockets (Socket.io), base de données SQLite.
-- `frontend/` : Application Next.js (App Router), Tailwind CSS, TypeScript.
-
-## 🚀 Installation & Lancement
-
-### Prérequis
-- Node.js (v18+)
-- npm
-
-### 1. Configuration du Backend
-```bash
-cd backend
-npm install
-node database_init.js
-npm run dev
-```
-
-### 2. Configuration du Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Accès : [http://localhost:3000](http://localhost:3000)
-
-## 🛠️ Stack Technique
-- **Frontend :** Next.js, Tailwind CSS, Lucide React, Framer Motion.
-- **Backend :** Express, Socket.io, SQLite (Drizzle/Better-SQLite3), JWT.
+- `backend/` : Serveur Express, gestion de la base de données et communications temps réel.
+- `frontend/` : Application Next.js pour les étudiants et les professeurs.
 
 ---
-© 2026 Institut Supérieur du Numérique (SupNum). Tous droits réservés.
+
+## 🚀 Installation & Lancement Rapide
+
+Pour commencer, clonez le projet et suivez les étapes ci-dessous.
+
+### 1. Configuration du Backend
+
+1. **Accédez au dossier :**
+   ```bash
+   cd backend
+   ```
+
+2. **Installez les dépendances :**
+   ```bash
+   npm install
+   ```
+
+3. **Initalisez la base de données :**
+   ```bash
+   node database_init.js
+   ```
+
+4. **Lancez le serveur :**
+   ```bash
+   npm run dev
+   ```
+   *Le serveur tourne généralement sur le port 5000.*
+
+---
+
+### 2. Configuration du Frontend
+
+1. **Ouvrez un nouveau terminal et accédez au dossier :**
+   ```bash
+   cd frontend
+   ```
+
+2. **Installez les dépendances :**
+   ```bash
+   npm install
+   ```
+
+3. **Lancez l'application :**
+   ```bash
+   npm run dev
+   ```
+   *L'application est accessible sur [http://localhost:3000](http://localhost:3000).*
+
+---
+
+## 🛠️ Technologies Utilisées
+
+- **Backend :** Node.js, Express, Socket.io, SQLite, Bcrypt.
+- **Frontend :** Next.js 15, Tailwind CSS, Lucide React.
+
+## 🔒 Fonctionnalités Anti-Triche
+- Surveillance en temps réel des étudiants.
+- Détection de changement d'onglet/fenêtre.
+- Alertes instantanées pour le professeur.
+
+---
+
+
