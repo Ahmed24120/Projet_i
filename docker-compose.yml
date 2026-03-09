@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    # We remove container_name to allow multiple instances (Blue/Green) driven by project names (e.g. -p blue)
+    restart: always
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      - ./backend/database.db:/app/database.db
+      - ./backend/uploads:/app/uploads
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - HOST=${SERVER_HOST:-localhost}
+
+  frontend:
+    build: ./frontend
+    restart: always
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      # Use dynamic API URL based on proxy or direct port
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    depends_on:
+      - backend

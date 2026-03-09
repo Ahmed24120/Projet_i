@@ -1,19 +1,19 @@
+# Use Node.js lts
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Dépendances système pour SQLite et compilation
-RUN apk add --no-cache python3 make g++ sqlite
-
+# Copy package files
 COPY package*.json ./
 
-RUN npm install --production
+# Install dependencies
+RUN npm ci --only=production
 
+# Copy source
 COPY . .
 
-# Création des dossiers nécessaires
-RUN mkdir -p uploads/exams
-
+# Expose port (adjust if needed)
 EXPOSE 3001
 
-CMD ["node", "src/server.js"]
+# Start command
+CMD ["npm", "start"]

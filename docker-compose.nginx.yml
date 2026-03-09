@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: projet_i_nginx
+    network_mode: "host" # Required to access localhost ports bound by docker-compose blue/green
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: always
