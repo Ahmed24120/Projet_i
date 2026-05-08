@@ -1,0 +1,83 @@
+function FilePreviewModal({ file, onClose }: { file: SubmittedFile | null, onClose: () => void }) {
+    const [content, setContent] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (file && isTextFile(file.name)) {
+            setLoading(true);
+            const token = localStorage.getItem("token");
+            // Standard fetch safely because apiFetch tries to parse JSON
+            fetch(`${baseUrl}${file.url}`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(res => res.text())
+                .then(txt => setContent(txt))
+                .catch(() => setContent("Error loading content"))
+                .finally(() => setLoading(false));
+        } else {
+            setContent(null);
+        }
+    }, [file]);
+
+    if (!file) return null;
+
+    const isImg = file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const isPdf = file.name.match(/\.pdf$/i);
+    const isVideo = file.name.match(/\.(mp4|webm|ogg)$/i);
+    const isAudio = file.name.match(/\.(mp3|wav)$/i);
+    const isText = isTextFile(file.name);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={onClose}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden relative" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+                    <h3 className="font-bold text-lg truncate flex items-center gap-2">
+                        <span>📄</span>
+                        {file.name}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                         <a href={`${baseUrl}${file.url}`} download className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+                            Download
+                        </a>
+                        <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                            ✖
+                        </button>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center p-4">
+                    {isImg ? (
+                        <img src={`${baseUrl}${file.url}`} alt="preview" className="max-w-full max-h-full object-contain shadow-lg" />
+                    ) : isPdf ? (
+                        <iframe src={`${baseUrl}${file.url}`} className="w-full h-full bg-white shadow-lg" title="pdf-viewer" />
+                    ) : isVideo ? (
+                        <video src={`${baseUrl}${file.url}`} controls className="max-w-full max-h-full shadow-lg" />
+                    ) : isAudio ? (
+                        <audio src={`${baseUrl}${file.url}`} controls className="w-full max-w-md shadow-lg" />
+                    ) : isText ? (
+                        loading ? (
+                             <div className="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+                        ) : (
+                            <pre className="w-full h-full bg-white p-4 rounded-lg overflow-auto font-mono text-sm border shadow-sm text-left" dir="ltr">
+                                {content}
+                            </pre>
+                        )
+                    ) : (
+                        <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-200">
+                             <div className="text-4xl mb-4">😶‍🌫️</div>
+                             <h4 className="font-bold text-gray-800 mb-2">المعاينة غير متاحة لهذا الملف</h4>
+                             <p className="text-gray-500 mb-6 text-sm">صيغة الملف ({file.name.split('.').pop()}) لا تدعم العرض المباشر.</p>
+                             <a href={`${baseUrl}${file.url}`} download className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors">
+                                 📥 تحميل الملف
+                             </a>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function isTextFile(name: string) {
+    return name.match(/\.(txt|md|json|js|jsx|ts|tsx|css|html|xml|py|java|c|cpp|h|sql|log|conf|ini|sh|bat)$/i);
+}
