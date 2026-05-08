@@ -626,10 +626,21 @@ router.post("/:id/allowed", authenticateToken, (req, res) => {
 
   const runInsert = () => {
     if (idsToAdd.size === 0) return res.json({ ok: true, added: 0 });
-    const stmt = db.prepare("INSERT OR IGNORE INTO exam_allowed_students (exam_id, student_id) VALUES (?, ?)");
-    idsToAdd.forEach(sid => stmt.run(req.params.id, sid));
-    stmt.finalize();
-    res.json({ ok: true, added: idsToAdd.size });
+
+    // PostgreSQL : pas de db.prepare() — on utilise Promise.all
+    const insertPromises = [...idsToAdd].map(sid =>
+      new Promise((resolve, reject) => {
+        db.run(
+          "INSERT INTO exam_allowed_students (exam_id, student_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+          [req.params.id, sid],
+          (err) => { if (err) reject(err); else resolve(); }
+        );
+      })
+    );
+
+    Promise.all(insertPromises)
+      .then(() => res.json({ ok: true, added: idsToAdd.size }))
+      .catch(err => res.status(500).json({ error: err.message }));
   };
 
   if (Array.isArray(matricules) && matricules.length > 0) {

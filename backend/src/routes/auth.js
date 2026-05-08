@@ -177,16 +177,16 @@ router.post("/register", async (req, res) => {
 
     const insertQuery = `
       INSERT INTO users (name, email, password_hash, role, matricule)
-      VALUES (?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?) RETURNING id
     `;
 
-    db.run(insertQuery, [fullName, email, hashedPassword, role, matricule || null], function (err) {
+    db.runReturning(insertQuery, [fullName, email, hashedPassword, role, matricule || null], (err, row) => {
       if (err) {
         console.error("Register Error:", err);
         return res.status(500).json({ message: "Erreur lors de la création du compte: " + err.message });
       }
 
-      const userId = this.lastID;
+      const userId = row.id;
       const token = jwt.sign(
         { id: userId, role, matricule: matricule || email, name: fullName },
         process.env.JWT_SECRET || "secret",
@@ -262,11 +262,11 @@ router.post("/users", authenticateToken, checkAdmin, async (req, res) => {
     });
     if (exists) return res.status(409).json({ error: "Utilisateur déjà existant (email ou matricule)" });
 
-    db.run("INSERT INTO users (name, email, password_hash, role, matricule) VALUES (?, ?, ?, ?, ?)",
+    db.runReturning("INSERT INTO users (name, email, password_hash, role, matricule) VALUES (?, ?, ?, ?, ?) RETURNING id",
       [name, email, hashedPassword, role, matricule || null],
-      function (err) {
+      (err, row) => {
         if (err) return res.status(500).json({ error: err.message });
-        const newId = this.lastID;
+        const newId = row.id;
 
         // Si etudiant et salle fournie, on update profile
         if (role === 'student' && salle) {

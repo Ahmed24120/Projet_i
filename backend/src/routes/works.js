@@ -157,17 +157,17 @@ router.post("/upload", authenticateToken, upload.array("files", 100), (req, res)
 
     const sql = `
       INSERT INTO works (exam_id, id_etud, nb_files, file_paths, nom, matricule, last_update, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'active') RETURNING id
     `;
 
     // Fallback nom ? req.body.nom is trusted blindly currently, maybe safer to query users table?
     // For now we keep req.body.nom to not break too much, but we enforce matricule from DB
     const studentName = req.body.nom || "Student";
 
-    db.run(sql, [examId, studentId, req.files.length, filePaths, studentName, matricule, now], function (err) {
+    db.runReturning(sql, [examId, studentId, req.files.length, filePaths, studentName, matricule, now], (err, row) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      const workId = this.lastID;
+      const workId = row.id;
 
       // Notification temps réel
       try {
@@ -204,8 +204,9 @@ router.post("/finalize", authenticateToken, (req, res) => {
     // 1. Mark as finalized
     const now = new Date().toISOString();
     db.run(`
-      INSERT OR REPLACE INTO exam_results (exam_id, student_id, is_finalized, finalized_at)
+      INSERT INTO exam_results (exam_id, student_id, is_finalized, finalized_at)
       VALUES (?, ?, 1, ?)
+      ON CONFLICT (exam_id, student_id) DO UPDATE SET is_finalized=1, finalized_at=EXCLUDED.finalized_at
     `, [examId, studentId, now], (err) => {
       if (err) return res.status(500).json({ error: "Erreur finalize: " + err.message });
 
