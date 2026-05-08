@@ -22,8 +22,10 @@ function isLocalNetwork(ip) {
         return true;
     }
 
-    // التحقق من البادئة
-    return cleanIp.startsWith(LOCAL_SUBNET_PREFIX);
+    // التحقق من أن الـ IP ينتمي لشبكات WiFi المحلية القياسية (Private IPs)
+    return cleanIp.startsWith('192.168.') || 
+           cleanIp.startsWith('10.') || 
+           cleanIp.startsWith('172.');
 }
 
 /**

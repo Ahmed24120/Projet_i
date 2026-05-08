@@ -46,6 +46,12 @@ const upload = multer({
       ".csv",
       ".ppt",
       ".pptx",
+      ".sql",
+      ".py",
+      ".php",
+      ".html",
+      ".css",
+      ".js",
     ];
     const ext = path.extname(file.originalname).toLowerCase();
     if (okExt.includes(ext)) return cb(null, true);
@@ -741,26 +747,21 @@ router.get("/:id/export", authenticateToken, (req, res) => {
         return res.status(404).json({ error: "Aucun fichier à exporter pour cet examen." });
       }
 
-      // 5. Zip It (PowerShell)
+      // 5. Zip It (Linux zip command)
       const zipPath = path.join(tempBase, zipName);
-      const psCommand = `Compress-Archive -Path "${targetDir}\\*" -DestinationPath "${zipPath}" -Force`;
-
-      if (process.platform !== 'win32') {
-        return res.status(501).json({ error: "ZIP export only supported on Windows server backend currently." });
-      }
 
       const { spawn } = require('child_process');
-      const ps = spawn('powershell.exe', ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psCommand]);
+      const zipProcess = spawn('zip', ['-r', zipPath, folderName], { cwd: workDir });
 
-      let psError = '';
-      ps.stderr.on('data', (data) => {
-        psError += data.toString();
+      let zipError = '';
+      zipProcess.stderr.on('data', (data) => {
+        zipError += data.toString();
       });
 
-      ps.on('close', (code) => {
+      zipProcess.on('close', (code) => {
         if (code !== 0) {
-          console.error("PowerShell Error Code:", code);
-          console.error("PowerShell Error Output:", psError);
+          console.error("ZIP Error Code:", code);
+          console.error("ZIP Error Output:", zipError);
           // Cleanup
           try {
             if (fs.existsSync(workDir)) fs.rmSync(workDir, { recursive: true, force: true });

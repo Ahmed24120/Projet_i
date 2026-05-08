@@ -81,6 +81,7 @@ export default function ProfessorDashboard() {
   const [selectedExamAccess, setSelectedExamAccess] = useState<number | null>(null);
   const [allowedStudents, setAllowedStudents] = useState<any[]>([]);
   const [accessLoading, setAccessLoading] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("prof_sidebar_open");
@@ -126,6 +127,9 @@ export default function ProfessorDashboard() {
     setIsConnected(socket.connected);
     socket.on('connect', () => setIsConnected(true));
     socket.on('disconnect', () => setIsConnected(false));
+    
+    const handleClickOutside = () => setOpenMenuId(null);
+    window.addEventListener('click', handleClickOutside);
 
     return () => {
       socket.off('update-student-list');
@@ -133,6 +137,7 @@ export default function ProfessorDashboard() {
       socket.off('professor:submission-update');
       socket.off('connect');
       socket.off('disconnect');
+      window.removeEventListener('click', handleClickOutside);
     };
   }, [socket]);
 
@@ -452,12 +457,22 @@ export default function ProfessorDashboard() {
                           </Button>
                         </Link>
 
-                        <div className="relative group/menu">
-                          <button className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><MoreHorizontal size={20} /></button>
-                          <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 hidden group-hover/menu:block z-20 overflow-hidden">
-                            <button onClick={() => setSelectedExamAccess(ex.id)} className="w-full text-left px-4 py-3 text-sm font-medium text-gray-600 hover:bg-purple-50 hover:text-purple-600 transition-colors flex items-center gap-2"><Lock size={14} /> Accès</button>
-                            <button onClick={() => deleteExam(ex.id)} className="w-full text-left px-4 py-3 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-2"><Trash2 size={14} /> Supprimer</button>
-                          </div>
+                        <div className="relative">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === ex.id ? null : ex.id);
+                            }} 
+                            className={`p-2 rounded-lg text-gray-400 transition-colors ${openMenuId === ex.id ? 'bg-gray-100 text-purple-600' : 'hover:bg-gray-50'}`}
+                          >
+                            <MoreHorizontal size={20} />
+                          </button>
+                          {openMenuId === ex.id && (
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-30 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                              <button onClick={() => { setSelectedExamAccess(ex.id); setOpenMenuId(null); }} className="w-full text-left px-4 py-3 text-sm font-medium text-gray-600 hover:bg-purple-50 hover:text-purple-600 transition-colors flex items-center gap-2"><Lock size={14} /> Accès</button>
+                              <button onClick={() => { deleteExam(ex.id); setOpenMenuId(null); }} className="w-full text-left px-4 py-3 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-2"><Trash2 size={14} /> Supprimer</button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -468,7 +483,7 @@ export default function ProfessorDashboard() {
                           <form onSubmit={(e) => { e.preventDefault(); uploadResources(ex.id, e.currentTarget); }} className="flex gap-4 items-end mb-4">
                             <div className="flex-1">
                               <label className="block text-[10px] font-bold text-gray-400 mb-1">Sujet (PDF)</label>
-                              <input type="file" name="subject" accept=".pdf" className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-white file:text-purple-600 file:border-purple-100 file:border hover:file:bg-purple-50 transition-colors" />
+                              <input type="file" name="subject" accept=".pdf,.docx,.xlsx,.sql,.py,.php,.html,.css,.js" className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-white file:text-purple-600 file:border-purple-100 file:border hover:file:bg-purple-50 transition-colors" />
                             </div>
                             <div className="flex-1">
                               <label className="block text-[10px] font-bold text-gray-400 mb-1">Annexes</label>

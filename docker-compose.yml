@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: 
+      context: ./backend
+    container_name: projet-i-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - JWT_SECRET=votre_secret_jwt_tres_securise
+      - NODE_ENV=production
+      - FRONTEND_URL=http://localhost:3000
+    volumes:
+      - ./backend/database.db:/app/database.db
+      - ./backend/uploads:/app/uploads
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: projet-i-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: always

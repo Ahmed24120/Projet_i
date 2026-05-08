@@ -35,7 +35,7 @@ export default function Home() {
 
           <div className="relative w-64 h-64 md:w-80 md:h-80 mx-auto">
             <Image
-              src="/logo_supnum.png"
+              src="/image.jpeg"
               alt="SupNum Logo"
               fill
               className="object-contain drop-shadow-xl"

@@ -10,13 +10,13 @@ interface NetworkStatus {
     ip?: string;
 }
 
-export default function NetworkDetector({ role }: { role: 'student' | 'professor' }) {
+export default function NetworkDetector({ role }: { role: 'student' | 'professor' | 'admin' }) {
     const [status, setStatus] = useState<NetworkStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const checkNetwork = async () => {
         try {
-            const res = await fetch(`${baseUrl}/api/check-network`);
+            const res = await fetch(`${baseUrl}/api/check-network`, { cache: 'no-store' });
             const data = await res.json();
 
             setStatus({ isLocal: data.isLocal, message: data.message, ip: data.ip });

@@ -442,7 +442,7 @@ export default function ExamRoom() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* Upload File */}
                                     <label className="relative group cursor-pointer">
-                                        <input type="file" className="hidden" multiple onChange={(e) => setSelectedFiles(e.target.files)} />
+                                        <input type="file" className="hidden" multiple accept=".pdf,.docx,.xlsx,.sql,.py,.php,.html,.css,.js" onChange={(e) => setSelectedFiles(e.target.files)} />
                                         <div className="h-40 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 transition-all flex flex-col items-center justify-center gap-3 group-hover:scale-[1.02] duration-200">
                                             <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-blue-500 mb-1">
                                                 <Upload className="w-6 h-6" />
