@@ -13,7 +13,7 @@ async function hashPassword(password) {
 const pool = new Pool({
   connectionString:
     process.env.DATABASE_URL ||
-    'postgresql://projet_user:mot_de_passe_securise@localhost:5432/projet_i_db',
+    'postgresql://projet_i:abdy24068@localhost:5433/projet_i_db',
 });
 
 pool.connect((err, client, release) => {
