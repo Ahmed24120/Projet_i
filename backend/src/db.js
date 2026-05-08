@@ -278,6 +278,19 @@ async function initDatabase() {
     // ──────────────────────────────────────
     const defaultPassword = await hashPassword('password123');
 
+    // Admin
+    const adminCheck = await pool.query(
+      "SELECT count(*) AS count FROM users WHERE email = 'admin@supnum.mr'"
+    );
+    if (parseInt(adminCheck.rows[0].count) === 0) {
+      const adminPassword = await hashPassword('admin');
+      await pool.query(
+        "INSERT INTO users (email, password_hash, role, name) VALUES ($1, $2, 'ADMIN', 'Administrateur Principal')",
+        ['admin@supnum.mr', adminPassword]
+      );
+      console.log('✅ Seed: Compte admin créé (admin@supnum.mr / admin)');
+    }
+
     const profCheck = await pool.query(
       "SELECT count(*) AS count FROM users WHERE email = 'professor@supnum.mr'"
     );

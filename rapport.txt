@@ -1,0 +1,86 @@
+====================================================================
+RAPPORT COMPLET : INTÉGRATION DE SAFE EXAM BROWSER (SEB)
+POUR LA PLATEFORME D'EXAMEN (Projet_i)
+====================================================================
+
+1. INTRODUCTION
+Safe Exam Browser (SEB) est un navigateur web "kiosque" qui prend le contrôle total de l'ordinateur de l'étudiant. Contrairement à un navigateur classique (Chrome, Firefox) où il est impossible de bloquer des raccourcis système via JavaScript, SEB agit au niveau du système d'exploitation (Windows, macOS, iOS).
+Il permet de :
+- Bloquer la touche Windows, Alt+Tab, Ctrl+Alt+Suppr, et les impressions écran.
+- Bloquer l'accès aux autres applications, à l'explorateur de fichiers et aux moteurs de recherche.
+- Forcer l'écran de l'étudiant à rester uniquement sur l'URL de l'examen.
+
+
+2. ARCHITECTURE DE L'INTÉGRATION (Node.js & Next.js)
+L'intégration de SEB nécessite une coopération stricte entre le client et votre backend (Serveur).
+
+- A) Le Fichier de Configuration (.seb)
+  L'administrateur crée un fichier `.seb` contenant :
+  L'URL de départ (ex: https://examen.supnum.mr/student/login) et les règles de blocage. SEB génère alors deux clés uniques : 
+  * Browser Exam Key (BEK) : Identifie le fichier de configuration précis.
+  * Config Key (CK) : Identifie la configuration indépendamment de la version de SEB.
+
+- B) Le Backend Node.js (Le Gardien)
+  Chaque fois qu'un étudiant tente de voir l'examen, le backend Node.js vérifie les en-têtes HTTP de la requête entrante.
+  L'en-tête "User-Agent" doit contenir le mot "SafeExamBrowser".
+  L'en-tête "x-safeexambrowser-configkeyhash" est vérifié avec la clé (CK) générée par votre école. Si la clé est mauvaise, le Node.js renvoie une erreur 403 (Interdit).
+
+- C) Le Frontend Next.js
+  Sur l'interface étudiante, un script vérifie si l'utilisateur est sur SEB. Si ce n'est pas le cas, un message rouge bloque l'accès "Veuillez ouvrir cet examen avec Safe Exam Browser".
+
+
+3. LES AVANTAGES (PROS)
+- Sécurité Maximale : C'est la solution la plus robuste pour empêcher la triche (recherche internet, ChatGPT, communication Discord) pendant un examen en présentiel.
+- Open Source & Gratuit : Utilisé mondialement par les plus grandes universités sans coût de licence.
+- Intégrité de l'Environnement : Grâce aux clés BEK/CK, un étudiant ne peut pas modifier le fichier de configuration pour s'octroyer des droits supplémentaires.
+- Compatibilité multi-plateforme : Fonctionne sur Windows, macOS et iOS.
+
+
+4. LES INCONVÉNIENTS ET LIMITES (CONS)
+- Complexité Logistique (Support) : Chaque étudiant DOIT télécharger et installer le logiciel SEB sur sa propre machine. S'ils ont des PC anciens, infectés par des virus, ou des antivirus très stricts (comme Avast ou McAfee), SEB peut être bloqué et empêcher l'étudiant de passer l'examen.
+- Ne remplace pas la surveillance humaine : SEB bloque l'ordinateur, mais n'empêche pas l'étudiant d'utiliser son smartphone posé sur ses genoux.
+- Difficulté technique à maintenir : À chaque mise à jour de MacOS ou Windows, des incompatibilités peuvent survenir, demandant une mise à jour de la configuration SEB.
+- Expérience Utilisateur rigide : En cas de crash de l'ordinateur, la procédure pour déverrouiller et reprendre l'examen peut causer un pic de stress chez l'étudiant.
+
+
+5. ERREURS COMMUNES D'INTÉGRATION ET LEURS SOLUTIONS
+Erreur #1 : Se fier uniquement au "User-Agent"
+  - Le problème : Si le backend vérifie juste que l'en-tête contient "SafeExamBrowser", un étudiant en informatique peut facilement "spoofer" (falsifier) son User-Agent sur Google Chrome et tricher.
+  - La solution : Il faut OBLIGATOIREMENT configurer le backend pour qu'il calcule et vérifie le "Config Key Hash" ou le "Browser Exam Key".
+
+Erreur #2 : Le fichier .seb mal distribué
+  - Le problème : Si un étudiant parvient à modifier le fichier `.seb` pour y ajouter une calculatrice ou un navigateur, il pourra tricher.
+  - La solution : Utiliser des mots de passe pour verrouiller la sortie (Quitting Password) du fichier `.seb`.
+
+Erreur #3 : Problèmes de réseau et WebSocket
+  - Le problème : Dans Projet_i, vous utilisez "Socket.io" pour la surveillance en temps réel. Parfois SEB bloque les protocoles WebSocket si la configuration SSL n'est pas parfaite.
+  - La solution : S'assurer que le nom de domaine possède un certificat SSL (HTTPS) 100% valide et sans erreurs.
+
+
+6. GUIDE D'INTÉGRATION POUR VOTRE PROJET (Projet_i)
+Si vous souhaitez l'implémenter, voici les 3 étapes de développement qu'il faudra réaliser dans le code :
+
+Étape A : Installer un package Node.js de hachage
+Dans le backend, il faudra installer un vérificateur de clé SEB (ou le coder manuellement avec `crypto` de Node.js) pour comparer le SHA256 de la requête avec votre clé Config Key.
+
+Étape B : Créer un Middleware `authSeb.js`
+Ce middleware sera ajouté aux routes `/exams`.
+```javascript
+const checkSEB = (req, res, next) => {
+    const configKeyHash = req.headers['x-safeexambrowser-configkeyhash'];
+    const url = req.protocol + '://' + req.get('host') + req.originalUrl;
+    // Logique de vérification du Hash...
+    if (hashEstValide) {
+        next();
+    } else {
+        res.status(403).json({ error: "Vous devez utiliser le navigateur d'examen officiel." });
+    }
+};
+```
+
+Étape C : Bloquer l'UI de l'étudiant
+Dans `frontend/app/student/dashboard/page.tsx`, cacher le bouton "Démarrer l'examen" et le remplacer par un bouton "Télécharger le fichier .seb" pour ceux qui naviguent avec Chrome classique.
+
+--------------------------------------------------------------------
+FIN DU RAPPORT
+--------------------------------------------------------------------

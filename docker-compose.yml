@@ -3,16 +3,16 @@ services:
     image: postgres:16-alpine
     container_name: projet-i-postgres
     environment:
-      POSTGRES_USER: projet_user
-      POSTGRES_PASSWORD: mot_de_passe_securise
+      POSTGRES_USER: projet_i
+      POSTGRES_PASSWORD: abdy24068
       POSTGRES_DB: projet_i_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U projet_user -d projet_i_db"]
+      test: ["CMD-SHELL", "pg_isready -U projet_i -d projet_i_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,7 +28,7 @@ services:
       - JWT_SECRET=votre_secret_jwt_tres_securise
       - NODE_ENV=production
       - FRONTEND_URL=http://localhost:3000
-      - DATABASE_URL=postgresql://projet_user:mot_de_passe_securise@postgres:5432/projet_i_db
+      - DATABASE_URL=postgresql://projet_i:abdy24068@postgres:5432/projet_i_db
     volumes:
       - ./backend/uploads:/app/uploads
     depends_on:

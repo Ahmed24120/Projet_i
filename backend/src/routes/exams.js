@@ -204,15 +204,15 @@ router.post("/", authenticateToken, (req, res) => {
   // On force le statut 'ready' à la création
   const sql = `
     INSERT INTO examen (titre, description, date_debut, date_fin, sujet_path, professor_id, room_number, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'ready')
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'ready') RETURNING id
   `;
 
-  db.run(
+  db.runReturning(
     sql,
     [titre, description || "", date_debut || "", date_fin || "", sujet_path || "", req.user.id, req.body.roomNumber || null],
-    function (err) {
+    (err, row) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ id: this.lastID, titre, description, professor_id: req.user.id, status: 'ready' });
+      res.json({ id: row.id, titre, description, professor_id: req.user.id, status: 'ready' });
     }
   );
 });
