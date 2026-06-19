@@ -42,6 +42,9 @@ function initSocket(server) {
 
   io.on("connection", (socket) => {
     console.log("🟢 Client connecté:", socket.id);
+    if (socket.userId) {
+      socket.join(`student:${socket.userId}`);
+    }
 
     // Initial Sync for new clients
     const activeList = Array.from(activeExams.entries()).map(([id, data]) => ({

@@ -1,0 +1,40 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    g++ \
+    php-cli \
+    php-mysqli \
+    php-pdo-mysql \
+    python3 \
+    sqlite3 \
+    mariadb-server \
+    mariadb-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Créer les répertoires nécessaires pour MariaDB
+RUN mkdir -p /var/lib/mysql /var/lib/mysql-template /run/mysqld /var/log/mysql
+
+# Initialiser le datadir par défaut pour accélérer le démarrage du conteneur
+RUN mysql_install_db --user=mysql --datadir=/var/lib/mysql-template
+
+# Créer un utilisateur non-privilégié pour l'exécution du code
+RUN useradd -m -s /bin/bash sandbox
+
+# Configurer les permissions pour l'utilisateur non-root sandbox
+RUN chown -R sandbox:sandbox /var/lib/mysql /var/lib/mysql-template /run/mysqld /var/log/mysql
+
+# Copier les scripts de démarrage et donner les permissions
+COPY docker/run-php-db.sh /usr/local/bin/run-php-db.sh
+COPY docker/run-php-web-db.sh /usr/local/bin/run-php-web-db.sh
+COPY docker/dump-db.sh /usr/local/bin/dump-db.sh
+
+RUN chmod +x /usr/local/bin/run-php-db.sh /usr/local/bin/run-php-web-db.sh /usr/local/bin/dump-db.sh && \
+    chown sandbox:sandbox /usr/local/bin/run-php-db.sh /usr/local/bin/run-php-web-db.sh /usr/local/bin/dump-db.sh
+
+USER sandbox
+
+WORKDIR /workspace
+
+CMD ["/bin/bash"]

@@ -268,7 +268,7 @@ export default function ProfessorMonitor() {
 
     const onlineCount = Object.values(students).filter(s => s.status === 'online').length;
 
-    const handleDownloadAll = () => {
+    const handleDownloadAll = async () => {
         const token = localStorage.getItem("token");
         // We use window.open with a query param if needed, or better, use a temporary anchor or direct fetch
         // For download with auth, we can't easily use window.open if cookies aren't used.
@@ -276,22 +276,49 @@ export default function ProfessorMonitor() {
         // The backend route router.get("/:id/export", authenticateToken...) suggests we need header.
         // Best approach: apiFetch with blob, then download.
         toast("Préparation du téléchargement...");
-        fetch(`${baseUrl}/exams/${id}/export`, {
-            headers: { Authorization: `Bearer ${token}` }
-        })
-            .then(async (res) => {
-                if (!res.ok) throw new Error(await res.text());
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `examen_${id}_export.zip`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                toast("Téléchargement démarré ✅");
-            })
-            .catch(e => toast("Erreur téléchargement: " + e.message));
+        try {
+            const res = await fetch(`${baseUrl}/exams/${id}/export`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error(await res.text());
+
+            const contentLength = res.headers.get("Content-Length");
+            const total = contentLength ? parseInt(contentLength, 10) : 0;
+            const reader = res.body!.getReader();
+            const chunks: any[] = [];
+            let received = 0;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                received += value.length;
+                if (total > 0) {
+                    setDownloadProgress(Math.round((received / total) * 100));
+                } else {
+                    // Unknown size: pulse between 10-90
+                    setDownloadProgress(prev => prev !== null && prev < 90 ? prev + 5 : 90);
+                }
+            }
+
+            setDownloadProgress(100);
+            const blob = new Blob(chunks);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // Use exam title for filename, fallback to id
+            const safeName = (examTitle || `examen_${id}`).replace(/[^a-zA-Z0-9\u00C0-\u024F\-_ ]/g, "").trim().replace(/\s+/g, "_");
+            a.download = `${safeName}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast("Téléchargement terminé ✅");
+        } catch (e: any) {
+            toast("Erreur téléchargement: " + e.message);
+        } finally {
+            setTimeout(() => setDownloadProgress(null), 1500);
+        }
     };
 
     return (
