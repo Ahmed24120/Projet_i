@@ -24,7 +24,10 @@ import {
     File as FileIcon,
     Send,
     Wifi,
-    WifiOff
+    WifiOff,
+    Terminal,
+    ExternalLink,
+    Code
 } from "lucide-react";
 
 export default function ExamRoom() {
@@ -418,7 +421,32 @@ export default function ExamRoom() {
                     </div>
 
                     {/* COL 2: Submission Center (6 cols) */}
-                    <div className="lg:col-span-6 flex flex-col">
+                    <div className="lg:col-span-6 space-y-6 flex flex-col">
+                        {/* IDE Access Card */}
+                        {!isFinalized && !isEnded && (
+                            <Card className="p-4 border border-indigo-100 shadow-md bg-gradient-to-r from-indigo-50/50 to-blue-50/50 overflow-hidden relative group">
+                                <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors"></div>
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-100 group-hover:rotate-6 transition-transform duration-300">
+                                            <Terminal className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-indigo-900 text-lg">Interface de Codage</h3>
+                                            <p className="text-sm text-indigo-600/70 font-medium">Éditeur de code intégré (Python, C++, PHP, Web)</p>
+                                        </div>
+                                    </div>
+                                    <Link href={`/student/exams/${id}/ide`} className="w-full sm:w-auto">
+                                        <Button type="button" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-indigo-100 shadow-xl py-5 px-8 rounded-xl transition-all hover:-translate-y-0.5 active:scale-95">
+                                            <Code className="w-4 h-4" />
+                                            Commencer le codage
+                                            <ExternalLink className="w-3 h-3 opacity-50 ml-1" />
+                                        </Button>
+                                    </Link>
+                                </div>
+                            </Card>
+                        )}
+
                         <Card className={`flex-1 p-0 overflow-hidden border-none shadow-xl bg-white rounded-2xl relative transition-all duration-300 ring-1 ring-gray-100 ${isFinalized ? 'opacity-80 grayscale-[0.5]' : ''}`}>
                             {isFinalized && (
                                 <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6">
