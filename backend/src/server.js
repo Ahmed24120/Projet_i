@@ -5,8 +5,14 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const http = require("http");
 const path = require("path");
+const mongoose = require('mongoose');
 
 const app = express();
+
+// MongoDB pour l'IDE (ideWork + sessions)
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/pse')
+  .then(() => console.log('✅ MongoDB connecté pour l\'IDE'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // DB
 require("./db");
@@ -16,6 +22,8 @@ const { initSocket } = require("./sockets");
 const authRoutes = require("./routes/auth");
 const examsRoutes = require("./routes/exams");
 const worksRoutes = require("./routes/works");
+const ideWorkRoutes = require('./routes/ideWork');
+const executeRoutes = require('./routes/execute');
 
 // Middlewares
 app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
@@ -31,6 +39,8 @@ app.use("/static", express.static(path.join(__dirname, "../uploads")));
 app.use("/auth", authRoutes);
 app.use("/exams", examsRoutes);
 app.use("/works", worksRoutes);
+app.use('/api/work', ideWorkRoutes);
+app.use('/api/execute', executeRoutes);
 
 app.get("/", (_req, res) => {
   res.json({ message: "✅ Backend + Socket + DB en marche" });

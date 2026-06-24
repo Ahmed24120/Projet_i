@@ -153,6 +153,42 @@ router.get("/", authenticateToken, (req, res) => {
   }
 });
 
+// GET /:id/status — Polling léger depuis l'IDE étudiant (toutes les 5s)
+router.get("/:id/status", authenticateToken, (req, res) => {
+  const examId = req.params.id;
+
+  // Vérification d'inscription : les étudiants ne peuvent interroger que leurs examens
+  const checkAllowed = (next) => {
+    if (req.user.role !== 'student') return next(); // Profs et admins passent directement
+    db.get(
+      `SELECT 1 FROM exam_allowed_students WHERE exam_id = ? AND student_id = ?`,
+      [examId, req.user.id],
+      (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row) return res.status(403).json({ error: "Accès non autorisé à cet examen" });
+        next();
+      }
+    );
+  };
+
+  checkAllowed(() => {
+    const sql = `SELECT id, status, status_code, sujet_path, duration_min, started_at FROM examen WHERE id = ?`;
+    db.get(sql, [examId], (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!row) return res.status(404).json({ error: "Examen non trouvé" });
+
+      res.json({
+        isPublished: (row.status_code === 1 || row.status === 'published' || row.status_code === 2 || row.status === 'launched'),
+        status: row.status,
+        status_code: row.status_code,
+        subjectFile: row.sujet_path || null,
+        durationMin: row.duration_min || null,
+        startedAt: row.started_at || null,
+      });
+    });
+  });
+});
+
 // GET /:id - Détails d'un examen
 router.get("/:id", authenticateToken, (req, res) => {
   const sql = `SELECT * FROM examen WHERE id = ?`;
