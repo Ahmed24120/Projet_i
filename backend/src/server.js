@@ -27,13 +27,31 @@ const executeRoutes = require('./routes/execute');
 
 // Middlewares
 app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
-app.use(helmet());
+app.use(helmet({
+  frameguard: false, // Permet l'affichage des PDF dans les iframes (sujet étudiant)
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      frameAncestors: ["*"], // Autorise l'embedding dans des iframes
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "*"],
+      connectSrc: ["'self'", "*"],
+    },
+  },
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Permet les requêtes cross-origin pour les fichiers statiques
+}));
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads
-app.use("/static", express.static(path.join(__dirname, "../uploads")));
+// Static uploads — Allow cross-origin access and iframe embedding for PDF subject files
+app.use("/static", (req, res, next) => {
+  res.setHeader("X-Frame-Options", "ALLOWALL");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+}, express.static(path.join(__dirname, "../uploads")));
 
 // API routes
 app.use("/auth", authRoutes);

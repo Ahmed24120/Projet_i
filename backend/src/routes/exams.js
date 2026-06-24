@@ -181,7 +181,7 @@ router.get("/:id/status", authenticateToken, (req, res) => {
         isPublished: (row.status_code === 1 || row.status === 'published' || row.status_code === 2 || row.status === 'launched'),
         status: row.status,
         status_code: row.status_code,
-        subjectFile: row.sujet_path || null,
+        subjectFile: row.sujet_path ? row.sujet_path.replace(/\\/g, '/') : null,
         durationMin: row.duration_min || null,
         startedAt: row.started_at || null,
       });
@@ -205,6 +205,8 @@ router.get("/:id", authenticateToken, (req, res) => {
     if (row.sujet_path === "") {
       row.sujet_path = null;
     }
+    // Alias for frontend compatibility: normalize path separators for URL use
+    row.subject_file = row.sujet_path ? row.sujet_path.replace(/\\/g, '/') : null;
 
     // Check if finalized or exited for this student
     if (req.user && req.user.role === 'student') {
