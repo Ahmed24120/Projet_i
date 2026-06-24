@@ -143,9 +143,13 @@ function waitForPhpServer(port, retries = 20, delayMs = 250) {
 // ── Detect if a PHP file contains HTML (web-server mode needed) ──────────────
 function isPhpWebApp(files) {
   return files.some(f =>
-    f.filename && (f.filename.endsWith('.php') || f.filename.endsWith('.html')) &&
-    typeof f.content === 'string' &&
-    /<(html|form|input|head|body|!DOCTYPE)/i.test(f.content)
+    f.filename && (
+      f.filename.endsWith('.html') || (
+        f.filename.endsWith('.php') &&
+        typeof f.content === 'string' &&
+        /<(html|form|input|head|body|!DOCTYPE)/i.test(f.content)
+      )
+    )
   );
 }
 
@@ -437,6 +441,7 @@ async function runInSandbox(files, currentFile, language, dbFilePath, stdinConte
       );
 
       stream.on('end', async () => {
+        if (timedOut) return;
         clearTimeout(timeoutHandle);
 
         let databaseUpdated = false;
