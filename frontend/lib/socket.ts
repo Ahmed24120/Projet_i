@@ -15,7 +15,6 @@ export function getSocket() {
 
     globalThis.__socket = io(url, {
       transports: ["polling", "websocket"],
-      reconnectionAttempts: 5,
     });
   }
   return globalThis.__socket;
