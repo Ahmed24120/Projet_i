@@ -786,7 +786,7 @@ export default function StudentIDEPage() {
                     srcDoc={previewHtml}
                     title="Prévisualisation HTML"
                     className="w-full h-full rounded bg-white shadow-inner"
-                    sandbox="allow-scripts allow-same-origin"
+                    sandbox="allow-scripts allow-same-origin allow-modals"
                   />
                 ) : output === "__PHP_WEB_PREVIEW__" && phpWebContainerId ? (
                   <iframe
@@ -794,7 +794,7 @@ export default function StudentIDEPage() {
                     src={`${getApiBase()}/api/execute/php-preview/${phpWebContainerId}/${phpWebEntryFile}?token=${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`}
                     title="Prévisualisation PHP"
                     className="w-full h-full rounded bg-white shadow-inner"
-                    sandbox="allow-scripts allow-same-origin allow-forms"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
                   />
                 ) : output ? (
                   <pre className="text-green-300 font-mono whitespace-pre-wrap text-sm">{output}</pre>

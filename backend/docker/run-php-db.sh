@@ -37,8 +37,6 @@ if [ $PHP_EXIT -eq 124 ]; then
   echo "Timeout: Le script PHP a dépassé la limite d'exécution de 20 secondes." >&2
 fi
 
-
-
 # D. Exportation et persistance après exécution
 DBS=$(mysql --socket=/run/mysqld/mysqld.sock -u root -B -N -e "SHOW DATABASES;" | grep -E -v '^(mysql|information_schema|performance_schema|sys)$')
 
